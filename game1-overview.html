@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game 01 — Nuthouse Games</title>
+  <style>
+    :root {
+      --bg:        #111318;
+      --surface:   #1c1f27;
+      --surface2:  #252932;
+      --border:    #2e3340;
+      --accent:    #4ecca3;
+      --accent2:   #f7b731;
+      --red:       #e05252;
+      --text:      #e0e4ef;
+      --muted:     #7a8099;
+      --code-bg:   #0d1117;
+      --font:      'Segoe UI', system-ui, sans-serif;
+      --mono:      'Cascadia Code', 'Consolas', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 40px 20px 80px;
+    }
+    .page { max-width: 900px; margin: 0 auto; }
+
+    /* Header */
+    .studio-header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+      margin-bottom: 40px;
+    }
+    .studio-name {
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
+    .subtitle { color: var(--muted); margin-top: 6px; font-size: 14px; }
+    .badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .badge-green  { background: #1a3d30; color: var(--accent); border: 1px solid #2d6b54; }
+    .badge-yellow { background: #3a3010; color: var(--accent2); border: 1px solid #6b5a20; }
+    .badge-red    { background: #3a1010; color: var(--red); border: 1px solid #6b2020; }
+
+    /* Section */
+    section { margin-bottom: 48px; }
+    h2 {
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    p { color: var(--muted); margin-bottom: 12px; }
+    p strong { color: var(--text); }
+
+    /* Core Loop */
+    .loop {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 20px 0;
+    }
+    .loop-step {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      text-align: center;
+      min-width: 120px;
+    }
+    .loop-step .label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+    .loop-step .value { font-weight: 600; margin-top: 2px; }
+    .arrow { color: var(--accent); font-size: 20px; padding: 0 4px; }
+
+    /* Grid cards */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .card h3 { font-size: 14px; margin-bottom: 6px; }
+    .card p { font-size: 13px; margin: 0; }
+
+    /* Scope lists */
+    .scope-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .scope-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .scope-box h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+    .scope-box.in  h3 { color: var(--accent); }
+    .scope-box.out h3 { color: var(--red); }
+    .scope-box ul { list-style: none; padding: 0; }
+    .scope-box ul li {
+      font-size: 13px;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .scope-box ul li:last-child { border-bottom: none; }
+    .scope-box.in  ul li::before { content: '✓'; color: var(--accent); font-weight: 700; }
+    .scope-box.out ul li::before { content: '✗'; color: var(--red); font-weight: 700; }
+
+    /* File tree */
+    .file-tree {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 2;
+    }
+    .file-tree .dir  { color: var(--accent); }
+    .file-tree .file { color: var(--text); }
+    .file-tree .note { color: var(--muted); font-style: italic; }
+
+    /* Code blocks */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+    code { font-family: var(--mono); font-size: 13px; }
+    .kw  { color: #c792ea; }
+    .fn  { color: #82aaff; }
+    .str { color: #c3e88d; }
+    .num { color: var(--accent2); }
+    .cm  { color: #546e7a; font-style: italic; }
+
+    /* System table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      background: var(--surface2);
+      color: var(--accent);
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      vertical-align: top;
+    }
+    td:first-child { color: var(--text); font-family: var(--mono); font-size: 12px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface); }
+
+    /* Upgrade table */
+    .upgrade-row td:nth-child(3) { color: var(--accent2); }
+
+    /* Checklist */
+    .checklist { list-style: none; padding: 0; }
+    .checklist li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .checklist li:last-child { border-bottom: none; }
+    .checklist li .check {
+      width: 18px; height: 18px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .checklist .phase {
+      color: var(--accent);
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-top: 16px;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    /* Timeline */
+    .timeline { position: relative; padding-left: 24px; }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 6px; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -20px; top: 6px;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .timeline-item .time {
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .timeline-item .task { color: var(--text); font-size: 14px; font-weight: 500; margin-top: 2px; }
+    .timeline-item .detail { color: var(--muted); font-size: 13px; }
+
+    @media (max-width: 600px) {
+      .scope-grid { grid-template-columns: 1fr; }
+      .loop { flex-direction: column; align-items: flex-start; }
+      .arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <header class="studio-header">
+    <div class="studio-name">Nuthouse Games</div>
+    <h1>Game 01 — Tap Clicker</h1>
+    <p class="subtitle">Working title: Compound &nbsp;·&nbsp; Engine: Godot 4 &nbsp;·&nbsp; Platform: Android (iOS later)</p>
+    <div class="badges">
+      <span class="badge badge-green">Weekend Build</span>
+      <span class="badge badge-yellow">Classroom Demo</span>
+      <span class="badge badge-green">Solo Dev</span>
+    </div>
+  </header>
+
+  <!-- Concept -->
+  <section>
+    <h2>Concept</h2>
+    <p>
+      A pure tap/idle incremental game. The player taps a button to generate a resource, buys upgrades
+      to increase passive income, and watches the numbers compound over time. The game is intentionally
+      minimal at launch — <strong>the goal is a working pipeline, not a sophisticated game.</strong>
+    </p>
+    <p>
+      Every architectural decision is made to be reused across future titles. This is Game 1 of a
+      catalog, not a one-off project.
+    </p>
+  </section>
+
+  <!-- Core Loop -->
+  <section>
+    <h2>Core Loop</h2>
+    <div class="loop">
+      <div class="loop-step">
+        <div class="label">Input</div>
+        <div class="value">Tap Button</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="loop-step">
+        <div class="label">Resource</div>
+        <div class="value">+1 Data</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="loop-step">
+        <div class="label">Decision</div>
+        <div class="value">Buy Upgrade?</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="loop-step">
+        <div class="label">Passive</div>
+        <div class="value">+N/sec auto</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="loop-step">
+        <div class="label">Return</div>
+        <div class="value">Offline Income</div>
+      </div>
+    </div>
+    <p>
+      The loop is self-reinforcing: upgrades remove the need to tap constantly, which opens time for
+      the player to return later. Offline income is the core retention hook — players return to collect
+      accumulated resources.
+    </p>
+  </section>
+
+  <!-- Upgrades -->
+  <section>
+    <h2>Launch Upgrades (3 Total)</h2>
+    <table>
+      <thead>
+        <tr><th>Name</th><th>Effect</th><th>Cost</th><th>Notes</th></tr>
+      </thead>
+      <tbody class="upgrade-row">
+        <tr>
+          <td>Auto Tap</td>
+          <td>+1 Data/second passively</td>
+          <td>25</td>
+          <td>First unlock, removes need to tap constantly</td>
+        </tr>
+        <tr>
+          <td>Double Down</td>
+          <td>2× all passive income</td>
+          <td>200</td>
+          <td>Multiplier applied to base passive rate</td>
+        </tr>
+        <tr>
+          <td>Overdrive</td>
+          <td>5× all passive income</td>
+          <td>2,000</td>
+          <td>Stacks with Double Down (10× total)</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:12px">
+      Upgrades expand to 8–12 in the first content update. Keep the launch tree hand-authored
+      — no procedural generation until you understand player behavior from analytics.
+    </p>
+  </section>
+
+  <!-- Scope -->
+  <section>
+    <h2>Launch Scope</h2>
+    <div class="scope-grid">
+      <div class="scope-box in">
+        <h3>Ships at Launch</h3>
+        <ul>
+          <li>One resource (Data)</li>
+          <li>3 upgrades in linear tree</li>
+          <li>Passive income (accumulates in _process)</li>
+          <li>Offline income on load (8hr cap)</li>
+          <li>Auto-save every 60 seconds</li>
+          <li>Number formatting (K / M)</li>
+          <li>Settings screen (audio toggle)</li>
+          <li>Android APK submitted to Play Store</li>
+          <li>GameAnalytics session start/end</li>
+        </ul>
+      </div>
+      <div class="scope-box out">
+        <h3>Deferred to Update 1</h3>
+        <ul>
+          <li>AdMob integration</li>
+          <li>Any IAP</li>
+          <li>iOS build</li>
+          <li>Push notifications</li>
+          <li>Prestige mechanic</li>
+          <li>Second resource type</li>
+          <li>Achievements</li>
+          <li>Cloud save</li>
+          <li>Main menu / splash screen</li>
+          <li>Custom art or themes</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section>
+    <h2>Project Architecture</h2>
+    <div class="file-tree">
+      <span class="dir">game_01/</span><br>
+      &nbsp;&nbsp;<span class="file">project.godot</span> &nbsp;<span class="note">— engine config, autoload declarations, export settings</span><br>
+      <br>
+      &nbsp;&nbsp;<span class="dir">autoloads/</span> &nbsp;<span class="note">— global singletons, always in memory</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="file">EventBus.gd</span> &nbsp;<span class="note">— signal hub, decouples all systems</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="file">SaveManager.gd</span> &nbsp;<span class="note">— sole writer to disk, auto-save timer</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="file">GameManager.gd</span> &nbsp;<span class="note">— all game state: resources, upgrades, rates</span><br>
+      <br>
+      &nbsp;&nbsp;<span class="dir">scenes/</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="file">Game.tscn</span> &nbsp;<span class="note">— main scene (UI layout)</span><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="file">Game.gd</span> &nbsp;<span class="note">— UI logic only, reads from GameManager via EventBus</span><br>
+      <br>
+      &nbsp;&nbsp;<span class="dir">assets/</span> &nbsp;<span class="note">— fonts, icons, audio (mostly empty at launch)</span><br>
+    </div>
+  </section>
+
+  <!-- Systems -->
+  <section>
+    <h2>Key Systems — Responsibilities</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Owns</th><th>Does NOT own</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>EventBus.gd</td>
+          <td>Signal definitions. Nothing else.</td>
+          <td>Any game logic or state</td>
+        </tr>
+        <tr>
+          <td>SaveManager.gd</td>
+          <td>File I/O. Auto-save timer. Load on startup.</td>
+          <td>What data means — just serialize/deserialize</td>
+        </tr>
+        <tr>
+          <td>GameManager.gd</td>
+          <td>All game state. Upgrade definitions. Tap logic. Passive rate calculation.</td>
+          <td>Any UI. Any file I/O. Calls SaveManager to save.</td>
+        </tr>
+        <tr>
+          <td>Game.gd</td>
+          <td>UI display. User input forwarding. Listens to EventBus signals.</td>
+          <td>Game logic. Never writes state directly — always calls GameManager.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:14px">
+      <strong>The rule:</strong> UI never touches game state directly. Game state never touches UI.
+      EventBus is the bridge. This pattern scales to any size project and makes testing straightforward.
+    </p>
+  </section>
+
+  <!-- Architecture Diagram -->
+  <section>
+    <h2>Data Flow</h2>
+    <pre>
+  Player taps button
+        │
+        ▼
+  Game.gd  ──calls──▶  GameManager.tap()
+                              │
+                        resources += 1
+                              │
+                        EventBus.resource_changed.emit(amount)
+                              │
+        ┌─────────────────────┘
+        ▼
+  Game.gd._on_resource_changed(amount)
+        │
+        ▼
+  ResourceLabel.text = format(amount)
+        │
+        ▼
+  _refresh_upgrade_buttons()   ← checks affordability
+    </pre>
+    <p>
+      GameManager owns the truth. Game.gd only reflects it.
+      If you add a second UI scene later (e.g. a prestige screen), it connects to the same signals
+      without touching GameManager code.
+    </p>
+  </section>
+
+  <!-- Weekend Schedule -->
+  <section>
+    <h2>Weekend Build Schedule</h2>
+    <div class="timeline">
+      <div class="timeline-item">
+        <div class="time">Saturday AM · 2–3 hrs</div>
+        <div class="task">Project scaffold + autoloads</div>
+        <div class="detail">project.godot configured, EventBus / SaveManager / GameManager created, APK export verified with a Hello World build</div>
+      </div>
+      <div class="timeline-item">
+        <div class="time">Saturday Midday · 3 hrs</div>
+        <div class="task">Core loop working</div>
+        <div class="detail">Tap generates resource, 3 upgrades purchasable, passive income accumulating in _process, offline income on load</div>
+      </div>
+      <div class="timeline-item">
+        <div class="time">Saturday PM · 2 hrs</div>
+        <div class="task">UI pass + settings screen</div>
+        <div class="detail">Resource label, per/sec label, upgrade buttons, audio toggle in settings. Functional, not beautiful.</div>
+      </div>
+      <div class="timeline-item">
+        <div class="time">Sunday AM · 2–3 hrs</div>
+        <div class="task">Save/load + analytics + Android build</div>
+        <div class="detail">Auto-save confirmed working, GameAnalytics session events firing, real APK installed on device</div>
+      </div>
+      <div class="timeline-item">
+        <div class="time">Sunday PM · 2 hrs</div>
+        <div class="task">Store listing + submit</div>
+        <div class="detail">Play Console draft listing, store screenshots (device screenshots are fine), submit for review</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Analytics -->
+  <section>
+    <h2>Analytics — Minimum Viable Events (Launch)</h2>
+    <table>
+      <thead>
+        <tr><th>Event</th><th>When</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>session_start</td>
+          <td>App opens / resumes</td>
+          <td>Day 1 / D7 / D30 retention baseline</td>
+        </tr>
+        <tr>
+          <td>session_end</td>
+          <td>App pauses / closes</td>
+          <td>Session length distribution</td>
+        </tr>
+        <tr>
+          <td>upgrade_purchased</td>
+          <td>Any upgrade bought</td>
+          <td>Which upgrades are reached before churn</td>
+        </tr>
+        <tr>
+          <td>offline_income_collected</td>
+          <td>On load with income pending</td>
+          <td>Measures return rate and session gap</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:14px">
+      Add <strong>ad events and IAP events in Update 1</strong> when those systems are integrated.
+      Do not instrument what you cannot yet act on.
+    </p>
+  </section>
+
+  <!-- Update Roadmap -->
+  <section>
+    <h2>Post-Launch Update Roadmap</h2>
+    <ul class="checklist">
+      <p class="phase">Update 1 — Week 3–4 after launch</p>
+      <li><div class="check"></div>AdMob banner + interstitial on game over / return</li>
+      <li><div class="check"></div>Rewarded ad: 2× income for 30 minutes</li>
+      <li><div class="check"></div>Remove Ads IAP ($1.99)</li>
+      <li><div class="check"></div>Push notifications ("Your lab is full!")</li>
+      <li><div class="check"></div>iOS build submitted</li>
+
+      <p class="phase" style="margin-top:20px">Update 2 — Month 2</p>
+      <li><div class="check"></div>Prestige mechanic ("Publish Research" resets for multiplier)</li>
+      <li><div class="check"></div>5 new upgrades in expanded tree</li>
+      <li><div class="check"></div>First cosmetic skin pack (IAP $0.99)</li>
+      <li><div class="check"></div>Achievements (based on analytics — unlock what players actually reach)</li>
+
+      <p class="phase" style="margin-top:20px">Update 3 — Month 3</p>
+      <li><div class="check"></div>Cross-promo button ("More Games") pointing to Game 2</li>
+      <li><div class="check"></div>Seasonal event reskin</li>
+      <li><div class="check"></div>Daily login reward</li>
+    </ul>
+  </section>
+
+  <!-- Footer -->
+  <footer style="margin-top:60px; padding-top:20px; border-top:1px solid var(--border); color:var(--muted); font-size:12px;">
+    Nuthouse Games · Game 01 · Working Title: Compound · Built with Godot 4 · Last updated March 2026
+  </footer>
+
+</div>
+</body>
+</html>
