@@ -2,151 +2,171 @@ extends Control
 
 # -------------------------------------------------------
 # Game.gd — UI logic only.
-#
-# RULE: This script never modifies game state directly.
-#   - User input → calls GameManager methods
-#   - EventBus signals → update labels and buttons
-#
-# The scene node layout this expects:
-#
-#   Game (Control)
-#   └── VBox (VBoxContainer)
-#       ├── ResourceLabel   (Label)
-#       ├── PerSecLabel     (Label)
-#       ├── TapButton       (Button)
-#       └── ScrollContainer (ScrollContainer)
-#           └── UpgradeList (VBoxContainer)
+# Calls GameManager for all state changes.
+# Listens to EventBus signals to redraw.
 # -------------------------------------------------------
 
-@onready var resource_label: Label        = $VBox/ResourceLabel
-@onready var per_sec_label:  Label        = $VBox/PerSecLabel
-@onready var tap_button:     Button       = $VBox/TapButton
-@onready var upgrade_list:   VBoxContainer = $VBox/ScrollContainer/UpgradeList
+@onready var resource_label: Label         = $VBox/ResourceLabel
+@onready var per_sec_label:  Label         = $VBox/PerSecLabel
+@onready var tap_button:     Button        = $VBox/TapButton
+@onready var asset_list:     VBoxContainer = $VBox/ScrollContainer/UpgradeList
 
 
 func _ready() -> void:
-	# Connect to signals from EventBus
 	EventBus.resource_changed.connect(_on_resource_changed)
 	EventBus.passive_rate_changed.connect(_on_passive_rate_changed)
-	EventBus.upgrade_purchased.connect(_on_upgrade_purchased)
+	EventBus.asset_purchased.connect(_on_asset_purchased)
+	EventBus.multiplier_purchased.connect(_on_multiplier_purchased)
 	EventBus.offline_income_collected.connect(_on_offline_income)
 
-	# Connect the tap button
 	tap_button.pressed.connect(_on_tap_pressed)
 
-	# Build upgrade button list from GameManager data
-	_build_upgrade_list()
-
-	# Populate labels with current state (important after loading a save)
+	_build_lists()
 	_refresh_ui()
 
-	# Debug cheat button — only visible in editor and debug builds, never in release
+	# Debug cheat — debug builds only, never in release APK
 	if OS.is_debug_build():
 		var cheat := Button.new()
-		cheat.text = "[DEBUG] +10,000"
-		cheat.pressed.connect(func() -> void: GameManager.add_resources(10000.0))
+		cheat.text = "[DEBUG] +$1,000,000"
+		cheat.pressed.connect(func() -> void: GameManager.add_resources(1_000_000.0))
 		$VBox.add_child(cheat)
 
 
 # -------------------------------------------------------
-# Input handlers — forward to GameManager, never touch state
+# Input
 # -------------------------------------------------------
 
 func _on_tap_pressed() -> void:
 	GameManager.tap()
 
 
-func _on_upgrade_pressed(index: int) -> void:
-	GameManager.buy_upgrade(index)
+func _on_asset_pressed(index: int) -> void:
+	GameManager.buy_asset(index)
+
+
+func _on_multiplier_pressed(index: int) -> void:
+	GameManager.buy_multiplier(index)
 
 
 # -------------------------------------------------------
-# EventBus signal handlers — update UI only
+# EventBus handlers
 # -------------------------------------------------------
 
 func _on_resource_changed(amount: float) -> void:
-	resource_label.text = _format_number(amount)
-	_refresh_upgrade_buttons()
+	resource_label.text = "$" + _fmt(amount)
+	_refresh_buttons()
 
 
 func _on_passive_rate_changed(rate: float) -> void:
 	if rate > 0.0:
-		per_sec_label.text = "+%s / sec" % _format_number(rate)
+		per_sec_label.text = "$%s / sec" % _fmt(rate)
 	else:
 		per_sec_label.text = ""
 
 
-func _on_upgrade_purchased(_index: int) -> void:
-	_refresh_upgrade_buttons()
+func _on_asset_purchased(index: int) -> void:
+	_refresh_asset_button(index)
+
+
+func _on_multiplier_purchased(index: int) -> void:
+	_refresh_multiplier_button(index)
 
 
 func _on_offline_income(amount: float) -> void:
-	# Simple notification — replace with a popup in Update 1
-	resource_label.text = "+%s while away!" % _format_number(amount)
-	await get_tree().create_timer(2.0).timeout
-	resource_label.text = _format_number(GameManager.resources)
+	resource_label.text = "+$%s while away!" % _fmt(amount)
+	await get_tree().create_timer(2.5).timeout
+	resource_label.text = "$" + _fmt(GameManager.resources)
 
 
 # -------------------------------------------------------
 # UI builders
 # -------------------------------------------------------
 
-func _build_upgrade_list() -> void:
-	# Clear any existing children (safe to call multiple times)
-	for child in upgrade_list.get_children():
+func _build_lists() -> void:
+	for child in asset_list.get_children():
 		child.queue_free()
 
-	for i in range(GameManager.UPGRADES.size()):
-		var upgrade: Dictionary = GameManager.UPGRADES[i]
+	# Section: Assets (repeatable)
+	var asset_header := Label.new()
+	asset_header.text = "── INVESTMENTS ──"
+	asset_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	asset_list.add_child(asset_header)
 
+	for i in range(GameManager.ASSETS.size()):
 		var btn := Button.new()
-		btn.name = "Upgrade_%d" % i
+		btn.name = "Asset_%d" % i
 		btn.custom_minimum_size = Vector2(0, 80)
-		btn.text = "%s\n%s\nCost: %s" % [
-			upgrade["name"],
-			upgrade["description"],
-			_format_number(upgrade["cost"]),
-		]
+		btn.pressed.connect(_on_asset_pressed.bind(i))
+		asset_list.add_child(btn)
+		_refresh_asset_button(i)
 
-		# Bind the index so each button knows which upgrade it represents
-		btn.pressed.connect(_on_upgrade_pressed.bind(i))
-		upgrade_list.add_child(btn)
+	# Section: Multipliers (one-time)
+	var mult_header := Label.new()
+	mult_header.text = "── STRATEGIES ──"
+	mult_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	asset_list.add_child(mult_header)
 
-	_refresh_upgrade_buttons()
+	for i in range(GameManager.MULTIPLIERS.size()):
+		var btn := Button.new()
+		btn.name = "Multiplier_%d" % i
+		btn.custom_minimum_size = Vector2(0, 80)
+		btn.pressed.connect(_on_multiplier_pressed.bind(i))
+		asset_list.add_child(btn)
+		_refresh_multiplier_button(i)
 
 
-func _refresh_upgrade_buttons() -> void:
-	for i in range(GameManager.UPGRADES.size()):
-		var btn: Button = upgrade_list.get_node_or_null("Upgrade_%d" % i)
-		if btn == null:
-			continue
+func _refresh_buttons() -> void:
+	for i in range(GameManager.ASSETS.size()):
+		_refresh_asset_button(i)
+	for i in range(GameManager.MULTIPLIERS.size()):
+		_refresh_multiplier_button(i)
 
-		if GameManager.upgrades_purchased[i]:
-			btn.disabled = true
-			btn.text = GameManager.UPGRADES[i]["name"] + "\n[Purchased]"
-		else:
-			btn.disabled = not GameManager.can_afford(i)
+
+func _refresh_asset_button(index: int) -> void:
+	var btn: Button = asset_list.get_node_or_null("Asset_%d" % index)
+	if btn == null:
+		return
+	var a: Dictionary = GameManager.ASSETS[index]
+	var owned: int = GameManager.assets_owned[index]
+	var cost: float = GameManager.get_asset_cost(index)
+	btn.text = "%s  [x%d]\n%s\nCost: $%s" % [a["name"], owned, a["description"], _fmt(cost)]
+	btn.disabled = not GameManager.can_afford_asset(index)
+
+
+func _refresh_multiplier_button(index: int) -> void:
+	var btn: Button = asset_list.get_node_or_null("Multiplier_%d" % index)
+	if btn == null:
+		return
+	var m: Dictionary = GameManager.MULTIPLIERS[index]
+	if GameManager.multipliers_purchased[index]:
+		btn.text = "%s\n[Purchased]" % m["name"]
+		btn.disabled = true
+	else:
+		btn.text = "%s\n%s\nCost: $%s" % [m["name"], m["description"], _fmt(m["cost"])]
+		btn.disabled = not GameManager.can_afford_multiplier(index)
 
 
 func _refresh_ui() -> void:
-	resource_label.text = _format_number(GameManager.resources)
-
+	resource_label.text = "$" + _fmt(GameManager.resources)
 	if GameManager.passive_rate > 0.0:
-		per_sec_label.text = "+%s / sec" % _format_number(GameManager.passive_rate)
-	else:
-		per_sec_label.text = ""
-
-	_refresh_upgrade_buttons()
+		per_sec_label.text = "$%s / sec" % _fmt(GameManager.passive_rate)
+	_refresh_buttons()
 
 
 # -------------------------------------------------------
-# Utility
+# Number formatting — K, M, B, T, Qa
 # -------------------------------------------------------
 
-func _format_number(n: float) -> String:
-	if n >= 1_000_000.0:
+func _fmt(n: float) -> String:
+	if n >= 1_000_000_000_000_000.0:
+		return "%.2fQa" % (n / 1_000_000_000_000_000.0)
+	elif n >= 1_000_000_000_000.0:
+		return "%.2fT" % (n / 1_000_000_000_000.0)
+	elif n >= 1_000_000_000.0:
+		return "%.2fB" % (n / 1_000_000_000.0)
+	elif n >= 1_000_000.0:
 		return "%.2fM" % (n / 1_000_000.0)
 	elif n >= 1_000.0:
 		return "%.1fK" % (n / 1_000.0)
 	else:
-		return "%d" % int(n)
+		return "%.2f" % n

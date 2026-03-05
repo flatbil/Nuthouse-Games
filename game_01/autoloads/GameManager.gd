@@ -2,98 +2,99 @@ extends Node
 
 # -------------------------------------------------------
 # GameManager — All game state lives here.
-#
-# This is the single source of truth for:
-#   - Current resources
-#   - Passive income rate
-#   - Which upgrades have been purchased
-#
-# UI scripts NEVER modify state directly.
-# They call methods here, and listen to EventBus signals
-# to know when to redraw.
 # -------------------------------------------------------
 
-# --- State ---
 var resources: float = 0.0
-var passive_rate: float = 0.0          # resources per second (recalculated)
-var upgrades_purchased: Array = []     # parallel bool array to UPGRADES
+var passive_rate: float = 0.0
+var assets_owned: Array = []          # int — how many of each asset purchased
+var multipliers_purchased: Array = [] # bool — one-time multiplier purchases
 
-# --- Upgrade Definitions ---
-# Each entry is a Dictionary with:
-#   name, description, cost
-#   passive_bonus      → adds flat +N/sec to base rate
-#   passive_multiplier → multiplies the total passive rate
-const UPGRADES: Array = [
+# --- Repeatable Assets ---
+# Each purchase costs more: cost = base_cost * growth_rate ^ owned
+# income = owned * income_per_sec (summed across all assets)
+const ASSETS: Array = [
 	{
-		"name": "Auto Tap",
-		"description": "+1 Data per second, passively.",
-		"cost": 25.0,
-		"passive_bonus": 1.0,
+		"name": "Side Hustle",
+		"description": "+$1 / sec each",
+		"base_cost": 10.0,
+		"growth_rate": 1.15,
+		"income_per_sec": 1.0,
 	},
 	{
-		"name": "Double Down",
-		"description": "2× all passive income.",
-		"cost": 200.0,
-		"passive_multiplier": 2.0,
+		"name": "Index Fund",
+		"description": "+$8 / sec each",
+		"base_cost": 100.0,
+		"growth_rate": 1.15,
+		"income_per_sec": 8.0,
 	},
 	{
-		"name": "Overdrive",
-		"description": "5× all passive income.",
-		"cost": 2000.0,
-		"passive_multiplier": 5.0,
+		"name": "Rental Property",
+		"description": "+$50 / sec each",
+		"base_cost": 1_000.0,
+		"growth_rate": 1.15,
+		"income_per_sec": 50.0,
+	},
+	{
+		"name": "Hedge Fund",
+		"description": "+$300 / sec each",
+		"base_cost": 10_000.0,
+		"growth_rate": 1.15,
+		"income_per_sec": 300.0,
+	},
+	{
+		"name": "Private Equity",
+		"description": "+$2000 / sec each",
+		"base_cost": 100_000.0,
+		"growth_rate": 1.15,
+		"income_per_sec": 2_000.0,
 	},
 ]
 
-# Offline income cap: 8 hours in seconds
-const OFFLINE_CAP_SECONDS := 28800.0
+# --- One-Time Multipliers ---
+# Purchased once, multiply total passive income permanently
+const MULTIPLIERS: Array = [
+	{
+		"name": "Reinvest Dividends",
+		"description": "2x all passive income",
+		"cost": 500.0,
+		"multiplier": 2.0,
+	},
+	{
+		"name": "Compound Interest",
+		"description": "3x all passive income",
+		"cost": 50_000.0,
+		"multiplier": 3.0,
+	},
+	{
+		"name": "Market Leverage",
+		"description": "5x all passive income",
+		"cost": 5_000_000.0,
+		"multiplier": 5.0,
+	},
+]
+
+const OFFLINE_CAP_SECONDS := 28800.0  # 8 hours
 
 
 func _ready() -> void:
-	upgrades_purchased.resize(UPGRADES.size())
-	upgrades_purchased.fill(false)
+	assets_owned.resize(ASSETS.size())
+	assets_owned.fill(0)
+	multipliers_purchased.resize(MULTIPLIERS.size())
+	multipliers_purchased.fill(false)
 	_load_game()
 
 
 func _process(delta: float) -> void:
 	if passive_rate > 0.0:
-		_add_resources(passive_rate * delta)
+		add_resources(passive_rate * delta)
 
 
 # -------------------------------------------------------
-# Public API — called by UI scripts
+# Public API
 # -------------------------------------------------------
 
 func tap() -> void:
-	_add_resources(1.0)
-
-
-func can_afford(index: int) -> bool:
-	if index < 0 or index >= UPGRADES.size():
-		return false
-	return resources >= UPGRADES[index]["cost"] and not upgrades_purchased[index]
-
-
-func buy_upgrade(index: int) -> void:
-	if not can_afford(index):
-		return
-
-	resources -= UPGRADES[index]["cost"]
-	upgrades_purchased[index] = true
-
-	_recalculate_passive_rate()
-
-	EventBus.upgrade_purchased.emit(index)
-	EventBus.resource_changed.emit(resources)
-
-	SaveManager.save()
-
-
-# -------------------------------------------------------
-# Private helpers
-# -------------------------------------------------------
-
-func _add_resources(amount: float) -> void:
-	add_resources(amount)
+	add_resources(1.0)
 
 
 func add_resources(amount: float) -> void:
@@ -101,40 +102,80 @@ func add_resources(amount: float) -> void:
 	EventBus.resource_changed.emit(resources)
 
 
+# Cost of the next purchase of a given asset
+func get_asset_cost(index: int) -> float:
+	var a: Dictionary = ASSETS[index]
+	return a["base_cost"] * pow(a["growth_rate"], float(assets_owned[index]))
+
+
+func can_afford_asset(index: int) -> bool:
+	return resources >= get_asset_cost(index)
+
+
+func buy_asset(index: int) -> void:
+	if not can_afford_asset(index):
+		return
+	resources -= get_asset_cost(index)
+	assets_owned[index] += 1
+	_recalculate_passive_rate()
+	EventBus.asset_purchased.emit(index)
+	EventBus.resource_changed.emit(resources)
+	SaveManager.save()
+
+
+func can_afford_multiplier(index: int) -> bool:
+	return resources >= MULTIPLIERS[index]["cost"] and not multipliers_purchased[index]
+
+
+func buy_multiplier(index: int) -> void:
+	if not can_afford_multiplier(index):
+		return
+	resources -= MULTIPLIERS[index]["cost"]
+	multipliers_purchased[index] = true
+	_recalculate_passive_rate()
+	EventBus.multiplier_purchased.emit(index)
+	EventBus.resource_changed.emit(resources)
+	SaveManager.save()
+
+
+# -------------------------------------------------------
+# Private
+# -------------------------------------------------------
+
 func _recalculate_passive_rate() -> void:
-	# Step 1: sum all flat bonuses from purchased upgrades
+	# Sum base income from all owned assets
 	var base := 0.0
-	for i in range(UPGRADES.size()):
-		if upgrades_purchased[i] and UPGRADES[i].has("passive_bonus"):
-			base += UPGRADES[i]["passive_bonus"]
+	for i in range(ASSETS.size()):
+		base += float(assets_owned[i]) * ASSETS[i]["income_per_sec"]
 
-	# Step 2: apply all multipliers from purchased upgrades
-	var multiplier := 1.0
-	for i in range(UPGRADES.size()):
-		if upgrades_purchased[i] and UPGRADES[i].has("passive_multiplier"):
-			multiplier *= UPGRADES[i]["passive_multiplier"]
+	# Apply all purchased multipliers
+	var mult := 1.0
+	for i in range(MULTIPLIERS.size()):
+		if multipliers_purchased[i]:
+			mult *= MULTIPLIERS[i]["multiplier"]
 
-	passive_rate = base * multiplier
+	passive_rate = base * mult
 	EventBus.passive_rate_changed.emit(passive_rate)
 
 
 func _load_game() -> void:
 	var data := SaveManager.load_save()
-
 	if data.is_empty():
-		return  # Fresh install, nothing to load
+		return
 
 	resources = float(data.get("resources", 0.0))
 
-	# Restore upgrade state from save
-	var saved: Array = data.get("upgrades_purchased", [])
-	for i in range(min(saved.size(), upgrades_purchased.size())):
-		upgrades_purchased[i] = bool(saved[i])
+	var saved_assets: Array = data.get("assets_owned", [])
+	for i in range(min(saved_assets.size(), assets_owned.size())):
+		assets_owned[i] = int(saved_assets[i])
 
-	# Recalculate passive rate from restored upgrades
+	var saved_multipliers: Array = data.get("multipliers_purchased", [])
+	for i in range(min(saved_multipliers.size(), multipliers_purchased.size())):
+		multipliers_purchased[i] = bool(saved_multipliers[i])
+
 	_recalculate_passive_rate()
 
-	# Apply offline income (capped at 8 hours)
+	# Offline income (capped at 8 hours)
 	var last_time: float = float(data.get("last_save_time", 0.0))
 	if last_time > 0.0 and passive_rate > 0.0:
 		var now: float = Time.get_unix_time_from_system()
