@@ -7,6 +7,10 @@ android/build/
 # Export presets — can contain local signing paths
 export_presets.cfg
 
+# Release keystore — never commit, back up separately
+*.keystore
+*.jks
+
 # Android / iOS build artifacts
 *.apk
 *.aab
