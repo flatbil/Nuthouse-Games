@@ -1,22 +1,24 @@
 extends Control
 
 # -------------------------------------------------------
-# Game.gd — UI logic only.
+# Game.gd — UI only. Reads state via EventBus signals.
 # Calls GameManager for all state changes.
-# Listens to EventBus signals to redraw.
 # -------------------------------------------------------
 
 @onready var resource_label: Label         = $VBox/ResourceLabel
 @onready var per_sec_label:  Label         = $VBox/PerSecLabel
+@onready var tap_label:      Label         = $VBox/TapLabel
 @onready var tap_button:     Button        = $VBox/TapButton
-@onready var asset_list:     VBoxContainer = $VBox/ScrollContainer/UpgradeList
+@onready var upgrade_list:   VBoxContainer = $VBox/ScrollContainer/UpgradeList
 
 
 func _ready() -> void:
 	EventBus.resource_changed.connect(_on_resource_changed)
 	EventBus.passive_rate_changed.connect(_on_passive_rate_changed)
-	EventBus.asset_purchased.connect(_on_asset_purchased)
-	EventBus.multiplier_purchased.connect(_on_multiplier_purchased)
+	EventBus.tap_value_changed.connect(_on_tap_value_changed)
+	EventBus.career_purchased.connect(_on_career_purchased)
+	EventBus.investment_purchased.connect(_on_investment_purchased)
+	EventBus.strategy_purchased.connect(_on_strategy_purchased)
 	EventBus.offline_income_collected.connect(_on_offline_income)
 
 	tap_button.pressed.connect(_on_tap_pressed)
@@ -24,11 +26,10 @@ func _ready() -> void:
 	_build_lists()
 	_refresh_ui()
 
-	# Debug cheat — debug builds only, never in release APK
 	if OS.is_debug_build():
 		var cheat := Button.new()
-		cheat.text = "[DEBUG] +$1,000,000"
-		cheat.pressed.connect(func() -> void: GameManager.add_resources(1_000_000.0))
+		cheat.text = "[DEBUG] +$100,000"
+		cheat.pressed.connect(func() -> void: GameManager.add_resources(100_000.0))
 		$VBox.add_child(cheat)
 
 
@@ -40,21 +41,13 @@ func _on_tap_pressed() -> void:
 	GameManager.tap()
 
 
-func _on_asset_pressed(index: int) -> void:
-	GameManager.buy_asset(index)
-
-
-func _on_multiplier_pressed(index: int) -> void:
-	GameManager.buy_multiplier(index)
-
-
 # -------------------------------------------------------
 # EventBus handlers
 # -------------------------------------------------------
 
 func _on_resource_changed(amount: float) -> void:
 	resource_label.text = "$" + _fmt(amount)
-	_refresh_buttons()
+	_refresh_all_buttons()
 
 
 func _on_passive_rate_changed(rate: float) -> void:
@@ -64,12 +57,20 @@ func _on_passive_rate_changed(rate: float) -> void:
 		per_sec_label.text = ""
 
 
-func _on_asset_purchased(index: int) -> void:
-	_refresh_asset_button(index)
+func _on_tap_value_changed(val: float) -> void:
+	tap_label.text = "$%s / tap" % _fmt(val)
 
 
-func _on_multiplier_purchased(index: int) -> void:
-	_refresh_multiplier_button(index)
+func _on_career_purchased(index: int) -> void:
+	_refresh_career_button(index)
+
+
+func _on_investment_purchased(index: int) -> void:
+	_refresh_investment_button(index)
+
+
+func _on_strategy_purchased(index: int) -> void:
+	_refresh_strategy_button(index)
 
 
 func _on_offline_income(amount: float) -> void:
@@ -83,78 +84,116 @@ func _on_offline_income(amount: float) -> void:
 # -------------------------------------------------------
 
 func _build_lists() -> void:
-	for child in asset_list.get_children():
+	for child in upgrade_list.get_children():
 		child.queue_free()
 
-	# Section: Assets (repeatable)
-	var asset_header := Label.new()
-	asset_header.text = "── INVESTMENTS ──"
-	asset_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	asset_list.add_child(asset_header)
-
-	for i in range(GameManager.ASSETS.size()):
+	# --- CAREER ---
+	_add_section_header("── CAREER ──")
+	for i in range(GameManager.CAREERS.size()):
 		var btn := Button.new()
-		btn.name = "Asset_%d" % i
-		btn.custom_minimum_size = Vector2(0, 80)
-		btn.pressed.connect(_on_asset_pressed.bind(i))
-		asset_list.add_child(btn)
-		_refresh_asset_button(i)
+		btn.name = "Career_%d" % i
+		btn.custom_minimum_size = Vector2(0, 72)
+		btn.pressed.connect(_on_career_pressed.bind(i))
+		upgrade_list.add_child(btn)
+		_refresh_career_button(i)
 
-	# Section: Multipliers (one-time)
-	var mult_header := Label.new()
-	mult_header.text = "── STRATEGIES ──"
-	mult_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	asset_list.add_child(mult_header)
-
-	for i in range(GameManager.MULTIPLIERS.size()):
+	# --- INVESTMENTS ---
+	_add_section_header("── INVESTMENTS ──")
+	for i in range(GameManager.INVESTMENTS.size()):
 		var btn := Button.new()
-		btn.name = "Multiplier_%d" % i
-		btn.custom_minimum_size = Vector2(0, 80)
-		btn.pressed.connect(_on_multiplier_pressed.bind(i))
-		asset_list.add_child(btn)
-		_refresh_multiplier_button(i)
+		btn.name = "Investment_%d" % i
+		btn.custom_minimum_size = Vector2(0, 72)
+		btn.pressed.connect(_on_investment_pressed.bind(i))
+		upgrade_list.add_child(btn)
+		_refresh_investment_button(i)
+
+	# --- STRATEGIES ---
+	_add_section_header("── STRATEGIES ──")
+	for i in range(GameManager.STRATEGIES.size()):
+		var btn := Button.new()
+		btn.name = "Strategy_%d" % i
+		btn.custom_minimum_size = Vector2(0, 72)
+		btn.pressed.connect(_on_strategy_pressed.bind(i))
+		upgrade_list.add_child(btn)
+		_refresh_strategy_button(i)
 
 
-func _refresh_buttons() -> void:
-	for i in range(GameManager.ASSETS.size()):
-		_refresh_asset_button(i)
-	for i in range(GameManager.MULTIPLIERS.size()):
-		_refresh_multiplier_button(i)
+func _add_section_header(title: String) -> void:
+	var lbl := Label.new()
+	lbl.text = title
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 14)
+	upgrade_list.add_child(lbl)
 
 
-func _refresh_asset_button(index: int) -> void:
-	var btn: Button = asset_list.get_node_or_null("Asset_%d" % index)
+func _on_career_pressed(index: int) -> void:
+	GameManager.buy_career(index)
+
+
+func _on_investment_pressed(index: int) -> void:
+	GameManager.buy_investment(index)
+
+
+func _on_strategy_pressed(index: int) -> void:
+	GameManager.buy_strategy(index)
+
+
+func _refresh_career_button(index: int) -> void:
+	var btn: Button = upgrade_list.get_node_or_null("Career_%d" % index)
 	if btn == null:
 		return
-	var a: Dictionary = GameManager.ASSETS[index]
-	var owned: int = GameManager.assets_owned[index]
-	var cost: float = GameManager.get_asset_cost(index)
-	btn.text = "%s  [x%d]\n%s\nCost: $%s" % [a["name"], owned, a["description"], _fmt(cost)]
-	btn.disabled = not GameManager.can_afford_asset(index)
-
-
-func _refresh_multiplier_button(index: int) -> void:
-	var btn: Button = asset_list.get_node_or_null("Multiplier_%d" % index)
-	if btn == null:
-		return
-	var m: Dictionary = GameManager.MULTIPLIERS[index]
-	if GameManager.multipliers_purchased[index]:
-		btn.text = "%s\n[Purchased]" % m["name"]
+	var c: Dictionary = GameManager.CAREERS[index]
+	if GameManager.careers_purchased[index]:
+		btn.text = "%s\n[Completed]" % c["name"]
 		btn.disabled = true
 	else:
-		btn.text = "%s\n%s\nCost: $%s" % [m["name"], m["description"], _fmt(m["cost"])]
-		btn.disabled = not GameManager.can_afford_multiplier(index)
+		btn.text = "%s\n%s\nCost: $%s" % [c["name"], c["description"], _fmt(c["cost"])]
+		btn.disabled = not GameManager.can_afford_career(index)
+
+
+func _refresh_investment_button(index: int) -> void:
+	var btn: Button = upgrade_list.get_node_or_null("Investment_%d" % index)
+	if btn == null:
+		return
+	var inv: Dictionary = GameManager.INVESTMENTS[index]
+	var owned: int = GameManager.investments_owned[index]
+	var cost: float = GameManager.get_investment_cost(index)
+	btn.text = "%s  [x%d]\n%s\nCost: $%s" % [inv["name"], owned, inv["description"], _fmt(cost)]
+	btn.disabled = not GameManager.can_afford_investment(index)
+
+
+func _refresh_strategy_button(index: int) -> void:
+	var btn: Button = upgrade_list.get_node_or_null("Strategy_%d" % index)
+	if btn == null:
+		return
+	var s: Dictionary = GameManager.STRATEGIES[index]
+	if GameManager.strategies_purchased[index]:
+		btn.text = "%s\n[Active]" % s["name"]
+		btn.disabled = true
+	else:
+		btn.text = "%s\n%s\nCost: $%s" % [s["name"], s["description"], _fmt(s["cost"])]
+		btn.disabled = not GameManager.can_afford_strategy(index)
+
+
+func _refresh_all_buttons() -> void:
+	for i in range(GameManager.CAREERS.size()):
+		_refresh_career_button(i)
+	for i in range(GameManager.INVESTMENTS.size()):
+		_refresh_investment_button(i)
+	for i in range(GameManager.STRATEGIES.size()):
+		_refresh_strategy_button(i)
 
 
 func _refresh_ui() -> void:
 	resource_label.text = "$" + _fmt(GameManager.resources)
+	tap_label.text = "$%s / tap" % _fmt(GameManager.tap_value)
 	if GameManager.passive_rate > 0.0:
 		per_sec_label.text = "$%s / sec" % _fmt(GameManager.passive_rate)
-	_refresh_buttons()
+	_refresh_all_buttons()
 
 
 # -------------------------------------------------------
-# Number formatting — K, M, B, T, Qa
+# Number formatting
 # -------------------------------------------------------
 
 func _fmt(n: float) -> String:

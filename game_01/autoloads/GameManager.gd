@@ -2,73 +2,135 @@ extends Node
 
 # -------------------------------------------------------
 # GameManager — All game state lives here.
+#
+# Three upgrade tracks:
+#   CAREERS     — one-time, increase tap value (your salary)
+#   INVESTMENTS — repeatable, passive income (your portfolio)
+#   STRATEGIES  — one-time, multiply passive income (smart money moves)
+#
+# Design intent:
+#   Tapping dominates early game. Investments supplement.
+#   Compound growth eventually catches up — mirrors reality.
 # -------------------------------------------------------
 
-var resources: float = 0.0
+var resources:   float = 0.0
 var passive_rate: float = 0.0
-var assets_owned: Array = []          # int — how many of each asset purchased
-var multipliers_purchased: Array = [] # bool — one-time multiplier purchases
+var tap_value:   float = 1.0
 
-# --- Repeatable Assets ---
-# Each purchase costs more: cost = base_cost * growth_rate ^ owned
-# income = owned * income_per_sec (summed across all assets)
-const ASSETS: Array = [
+var careers_purchased:    Array = []  # bool — one-time career upgrades
+var investments_owned:    Array = []  # int  — repeatable investment purchases
+var strategies_purchased: Array = []  # bool — one-time passive multipliers
+
+# -------------------------------------------------------
+# CAREERS — increase tap value permanently (one-time each)
+# Tapping represents your active income / salary.
+# Each career step should feel like a meaningful life event.
+# -------------------------------------------------------
+const CAREERS: Array = [
 	{
-		"name": "Side Hustle",
-		"description": "+$1 / sec each",
-		"base_cost": 10.0,
-		"growth_rate": 1.15,
-		"income_per_sec": 1.0,
+		"name": "Night Classes",
+		"description": "Learn new skills. Tap +$4.",
+		"cost": 40.0,
+		"tap_bonus": 4.0,
 	},
 	{
-		"name": "Index Fund",
-		"description": "+$8 / sec each",
-		"base_cost": 100.0,
-		"growth_rate": 1.15,
-		"income_per_sec": 8.0,
+		"name": "Associate's Degree",
+		"description": "Entry-level professional. Tap +$16.",
+		"cost": 400.0,
+		"tap_bonus": 16.0,
 	},
 	{
-		"name": "Rental Property",
-		"description": "+$50 / sec each",
-		"base_cost": 1_000.0,
-		"growth_rate": 1.15,
-		"income_per_sec": 50.0,
+		"name": "Bachelor's Degree",
+		"description": "Career jump. Tap +$80.",
+		"cost": 5_000.0,
+		"tap_bonus": 80.0,
 	},
 	{
-		"name": "Hedge Fund",
-		"description": "+$300 / sec each",
-		"base_cost": 10_000.0,
-		"growth_rate": 1.15,
-		"income_per_sec": 300.0,
+		"name": "Professional Certification",
+		"description": "Become a specialist. Tap +$300.",
+		"cost": 40_000.0,
+		"tap_bonus": 300.0,
 	},
 	{
-		"name": "Private Equity",
-		"description": "+$2000 / sec each",
-		"base_cost": 100_000.0,
-		"growth_rate": 1.15,
-		"income_per_sec": 2_000.0,
+		"name": "Master's Degree",
+		"description": "Management track. Tap +$1,200.",
+		"cost": 350_000.0,
+		"tap_bonus": 1_200.0,
+	},
+	{
+		"name": "Executive Track",
+		"description": "C-suite income. Tap +$5,000.",
+		"cost": 3_000_000.0,
+		"tap_bonus": 5_000.0,
 	},
 ]
 
-# --- One-Time Multipliers ---
-# Purchased once, multiply total passive income permanently
-const MULTIPLIERS: Array = [
+# -------------------------------------------------------
+# INVESTMENTS — repeatable, exponential cost scaling
+# cost = base_cost * growth_rate ^ owned
+# Passive income should feel like a bonus, not a replacement
+# for active income — especially early game.
+# -------------------------------------------------------
+const INVESTMENTS: Array = [
 	{
-		"name": "Reinvest Dividends",
-		"description": "2x all passive income",
-		"cost": 500.0,
+		"name": "Savings Account",
+		"description": "+$0.10 / sec each",
+		"base_cost": 150.0,
+		"growth_rate": 1.2,
+		"income_per_sec": 0.10,
+	},
+	{
+		"name": "Index Funds",
+		"description": "+$1 / sec each",
+		"base_cost": 2_000.0,
+		"growth_rate": 1.2,
+		"income_per_sec": 1.0,
+	},
+	{
+		"name": "Rental Property",
+		"description": "+$12 / sec each",
+		"base_cost": 30_000.0,
+		"growth_rate": 1.2,
+		"income_per_sec": 12.0,
+	},
+	{
+		"name": "Business Equity",
+		"description": "+$120 / sec each",
+		"base_cost": 400_000.0,
+		"growth_rate": 1.2,
+		"income_per_sec": 120.0,
+	},
+	{
+		"name": "Venture Capital",
+		"description": "+$1,500 / sec each",
+		"base_cost": 6_000_000.0,
+		"growth_rate": 1.2,
+		"income_per_sec": 1_500.0,
+	},
+]
+
+# -------------------------------------------------------
+# STRATEGIES — one-time multipliers on passive income
+# Represent smart financial decisions: tax efficiency,
+# diversification, employer matching.
+# -------------------------------------------------------
+const STRATEGIES: Array = [
+	{
+		"name": "401k Employer Match",
+		"description": "2x all investment income",
+		"cost": 8_000.0,
 		"multiplier": 2.0,
 	},
 	{
-		"name": "Compound Interest",
-		"description": "3x all passive income",
-		"cost": 50_000.0,
+		"name": "Tax Optimization",
+		"description": "3x all investment income",
+		"cost": 500_000.0,
 		"multiplier": 3.0,
 	},
 	{
-		"name": "Market Leverage",
-		"description": "5x all passive income",
-		"cost": 5_000_000.0,
+		"name": "Diversified Portfolio",
+		"description": "5x all investment income",
+		"cost": 20_000_000.0,
 		"multiplier": 5.0,
 	},
 ]
@@ -77,10 +139,12 @@ const OFFLINE_CAP_SECONDS := 28800.0  # 8 hours
 
 
 func _ready() -> void:
-	assets_owned.resize(ASSETS.size())
-	assets_owned.fill(0)
-	multipliers_purchased.resize(MULTIPLIERS.size())
-	multipliers_purchased.fill(false)
+	careers_purchased.resize(CAREERS.size())
+	careers_purchased.fill(false)
+	investments_owned.resize(INVESTMENTS.size())
+	investments_owned.fill(0)
+	strategies_purchased.resize(STRATEGIES.size())
+	strategies_purchased.fill(false)
 	_load_game()
 
 
@@ -94,7 +158,7 @@ func _process(delta: float) -> void:
 # -------------------------------------------------------
 
 func tap() -> void:
-	add_resources(1.0)
+	add_resources(tap_value)
 
 
 func add_resources(amount: float) -> void:
@@ -102,38 +166,59 @@ func add_resources(amount: float) -> void:
 	EventBus.resource_changed.emit(resources)
 
 
-# Cost of the next purchase of a given asset
-func get_asset_cost(index: int) -> float:
-	var a: Dictionary = ASSETS[index]
-	return a["base_cost"] * pow(a["growth_rate"], float(assets_owned[index]))
+# --- Careers ---
+
+func can_afford_career(index: int) -> bool:
+	return resources >= CAREERS[index]["cost"] and not careers_purchased[index]
 
 
-func can_afford_asset(index: int) -> bool:
-	return resources >= get_asset_cost(index)
-
-
-func buy_asset(index: int) -> void:
-	if not can_afford_asset(index):
+func buy_career(index: int) -> void:
+	if not can_afford_career(index):
 		return
-	resources -= get_asset_cost(index)
-	assets_owned[index] += 1
-	_recalculate_passive_rate()
-	EventBus.asset_purchased.emit(index)
+	resources -= CAREERS[index]["cost"]
+	careers_purchased[index] = true
+	tap_value += CAREERS[index]["tap_bonus"]
+	EventBus.tap_value_changed.emit(tap_value)
+	EventBus.career_purchased.emit(index)
 	EventBus.resource_changed.emit(resources)
 	SaveManager.save()
 
 
-func can_afford_multiplier(index: int) -> bool:
-	return resources >= MULTIPLIERS[index]["cost"] and not multipliers_purchased[index]
+# --- Investments ---
+
+func get_investment_cost(index: int) -> float:
+	var inv: Dictionary = INVESTMENTS[index]
+	return inv["base_cost"] * pow(inv["growth_rate"], float(investments_owned[index]))
 
 
-func buy_multiplier(index: int) -> void:
-	if not can_afford_multiplier(index):
+func can_afford_investment(index: int) -> bool:
+	return resources >= get_investment_cost(index)
+
+
+func buy_investment(index: int) -> void:
+	if not can_afford_investment(index):
 		return
-	resources -= MULTIPLIERS[index]["cost"]
-	multipliers_purchased[index] = true
+	resources -= get_investment_cost(index)
+	investments_owned[index] += 1
 	_recalculate_passive_rate()
-	EventBus.multiplier_purchased.emit(index)
+	EventBus.investment_purchased.emit(index)
+	EventBus.resource_changed.emit(resources)
+	SaveManager.save()
+
+
+# --- Strategies ---
+
+func can_afford_strategy(index: int) -> bool:
+	return resources >= STRATEGIES[index]["cost"] and not strategies_purchased[index]
+
+
+func buy_strategy(index: int) -> void:
+	if not can_afford_strategy(index):
+		return
+	resources -= STRATEGIES[index]["cost"]
+	strategies_purchased[index] = true
+	_recalculate_passive_rate()
+	EventBus.strategy_purchased.emit(index)
 	EventBus.resource_changed.emit(resources)
 	SaveManager.save()
 
@@ -143,16 +228,14 @@ func buy_multiplier(index: int) -> void:
 # -------------------------------------------------------
 
 func _recalculate_passive_rate() -> void:
-	# Sum base income from all owned assets
 	var base := 0.0
-	for i in range(ASSETS.size()):
-		base += float(assets_owned[i]) * ASSETS[i]["income_per_sec"]
+	for i in range(INVESTMENTS.size()):
+		base += float(investments_owned[i]) * INVESTMENTS[i]["income_per_sec"]
 
-	# Apply all purchased multipliers
 	var mult := 1.0
-	for i in range(MULTIPLIERS.size()):
-		if multipliers_purchased[i]:
-			mult *= MULTIPLIERS[i]["multiplier"]
+	for i in range(STRATEGIES.size()):
+		if strategies_purchased[i]:
+			mult *= STRATEGIES[i]["multiplier"]
 
 	passive_rate = base * mult
 	EventBus.passive_rate_changed.emit(passive_rate)
@@ -165,17 +248,27 @@ func _load_game() -> void:
 
 	resources = float(data.get("resources", 0.0))
 
-	var saved_assets: Array = data.get("assets_owned", [])
-	for i in range(min(saved_assets.size(), assets_owned.size())):
-		assets_owned[i] = int(saved_assets[i])
+	var saved_careers: Array = data.get("careers_purchased", [])
+	for i in range(min(saved_careers.size(), careers_purchased.size())):
+		careers_purchased[i] = bool(saved_careers[i])
 
-	var saved_multipliers: Array = data.get("multipliers_purchased", [])
-	for i in range(min(saved_multipliers.size(), multipliers_purchased.size())):
-		multipliers_purchased[i] = bool(saved_multipliers[i])
+	var saved_investments: Array = data.get("investments_owned", [])
+	for i in range(min(saved_investments.size(), investments_owned.size())):
+		investments_owned[i] = int(saved_investments[i])
+
+	var saved_strategies: Array = data.get("strategies_purchased", [])
+	for i in range(min(saved_strategies.size(), strategies_purchased.size())):
+		strategies_purchased[i] = bool(saved_strategies[i])
+
+	# Rebuild tap value from purchased careers
+	tap_value = 1.0
+	for i in range(CAREERS.size()):
+		if careers_purchased[i]:
+			tap_value += CAREERS[i]["tap_bonus"]
 
 	_recalculate_passive_rate()
 
-	# Offline income (capped at 8 hours)
+	# Offline income
 	var last_time: float = float(data.get("last_save_time", 0.0))
 	if last_time > 0.0 and passive_rate > 0.0:
 		var now: float = Time.get_unix_time_from_system()
@@ -186,3 +279,4 @@ func _load_game() -> void:
 			EventBus.offline_income_collected.emit(offline_earned)
 
 	EventBus.resource_changed.emit(resources)
+	EventBus.tap_value_changed.emit(tap_value)

@@ -1,9 +1,5 @@
 extends Node
 
-# -------------------------------------------------------
-# SaveManager — The ONLY system that reads or writes disk.
-# -------------------------------------------------------
-
 const SAVE_PATH := "user://save.json"
 const AUTOSAVE_INTERVAL := 60.0
 
@@ -20,16 +16,15 @@ func _process(delta: float) -> void:
 func save() -> void:
 	var data := {
 		"resources": GameManager.resources,
-		"assets_owned": GameManager.assets_owned,
-		"multipliers_purchased": GameManager.multipliers_purchased,
+		"careers_purchased": GameManager.careers_purchased,
+		"investments_owned": GameManager.investments_owned,
+		"strategies_purchased": GameManager.strategies_purchased,
 		"last_save_time": Time.get_unix_time_from_system(),
 	}
-
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file == null:
 		push_error("SaveManager: could not open save file for writing.")
 		return
-
 	file.store_string(JSON.stringify(data))
 	file.close()
 
@@ -37,19 +32,15 @@ func save() -> void:
 func load_save() -> Dictionary:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return {}
-
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
 	if file == null:
 		push_error("SaveManager: could not open save file for reading.")
 		return {}
-
 	var content := file.get_as_text()
 	file.close()
-
 	var result = JSON.parse_string(content)
 	if result is Dictionary:
 		return result
-
 	push_error("SaveManager: save file is corrupt or unreadable.")
 	return {}
 
