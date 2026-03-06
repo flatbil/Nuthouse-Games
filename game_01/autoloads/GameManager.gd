@@ -169,6 +169,8 @@ func _process(delta: float) -> void:
 
 func tap() -> void:
 	add_resources(tap_value)
+	game_days += 1.0 / 24.0  # 1 tap = 1 game hour
+	EventBus.game_days_changed.emit(game_days)
 
 
 func add_resources(amount: float) -> void:
