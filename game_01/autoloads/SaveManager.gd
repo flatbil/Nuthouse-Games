@@ -16,6 +16,9 @@ func _process(delta: float) -> void:
 func save() -> void:
 	var data := {
 		"resources": GameManager.resources,
+		"game_days": GameManager.game_days,
+		"total_invested": GameManager.total_invested,
+		"total_dividends_earned": GameManager.total_dividends_earned,
 		"careers_purchased": GameManager.careers_purchased,
 		"investments_owned": GameManager.investments_owned,
 		"strategies_purchased": GameManager.strategies_purchased,

@@ -5,11 +5,14 @@ extends Control
 # Calls GameManager for all state changes.
 # -------------------------------------------------------
 
-@onready var resource_label: Label         = $VBox/ResourceLabel
-@onready var per_sec_label:  Label         = $VBox/PerSecLabel
-@onready var tap_label:      Label         = $VBox/TapLabel
-@onready var tap_button:     Button        = $VBox/TapButton
-@onready var upgrade_list:   VBoxContainer = $VBox/ScrollContainer/UpgradeList
+@onready var resource_label:    Label         = $VBox/ResourceLabel
+@onready var per_sec_label:     Label         = $VBox/PerSecLabel
+@onready var tap_label:         Label         = $VBox/TapLabel
+@onready var days_label:        Label         = $VBox/DaysLabel
+@onready var tap_button:        Button        = $VBox/TapButton
+@onready var portfolio_label:   Label         = $VBox/PortfolioLabel
+@onready var retirement_label:  Label         = $VBox/RetirementLabel
+@onready var upgrade_list:      VBoxContainer = $VBox/ScrollContainer/UpgradeList
 
 
 func _ready() -> void:
@@ -20,6 +23,8 @@ func _ready() -> void:
 	EventBus.investment_purchased.connect(_on_investment_purchased)
 	EventBus.strategy_purchased.connect(_on_strategy_purchased)
 	EventBus.offline_income_collected.connect(_on_offline_income)
+	EventBus.game_days_changed.connect(_on_game_days_changed)
+	EventBus.portfolio_changed.connect(_on_portfolio_changed)
 
 	tap_button.pressed.connect(_on_tap_pressed)
 
@@ -52,13 +57,14 @@ func _on_resource_changed(amount: float) -> void:
 
 func _on_passive_rate_changed(rate: float) -> void:
 	if rate > 0.0:
-		per_sec_label.text = "$%s / sec" % _fmt(rate)
+		per_sec_label.text = "$%s / day" % _fmt(rate)
 	else:
 		per_sec_label.text = ""
+	_refresh_retirement()
 
 
 func _on_tap_value_changed(val: float) -> void:
-	tap_label.text = "$%s / tap" % _fmt(val)
+	tap_label.text = "$%s / hr" % _fmt(val)
 
 
 func _on_career_purchased(index: int) -> void:
@@ -77,6 +83,19 @@ func _on_offline_income(amount: float) -> void:
 	resource_label.text = "+$%s while away!" % _fmt(amount)
 	await get_tree().create_timer(2.5).timeout
 	resource_label.text = "$" + _fmt(GameManager.resources)
+
+
+func _on_game_days_changed(days: float) -> void:
+	var years: int = int(days / 365.0)
+	var day_in_year: int = int(days) % 365
+	days_label.text = "Day %d  ·  Year %d" % [day_in_year + 1, years]
+	_refresh_retirement()
+
+
+func _on_portfolio_changed(total_invested: float, dividends: float) -> void:
+	var portfolio_value: float = total_invested + dividends
+	portfolio_label.text = "Portfolio: $%s  |  Dividends: $%s" % [_fmt(portfolio_value), _fmt(dividends)]
+	_refresh_retirement()
 
 
 # -------------------------------------------------------
@@ -102,7 +121,7 @@ func _build_lists() -> void:
 	for i in range(GameManager.INVESTMENTS.size()):
 		var btn := Button.new()
 		btn.name = "Investment_%d" % i
-		btn.custom_minimum_size = Vector2(0, 72)
+		btn.custom_minimum_size = Vector2(0, 88)
 		btn.pressed.connect(_on_investment_pressed.bind(i))
 		upgrade_list.add_child(btn)
 		_refresh_investment_button(i)
@@ -158,7 +177,15 @@ func _refresh_investment_button(index: int) -> void:
 	var inv: Dictionary = GameManager.INVESTMENTS[index]
 	var owned: int = GameManager.investments_owned[index]
 	var cost: float = GameManager.get_investment_cost(index)
-	btn.text = "%s  [x%d]\n%s\nCost: $%s" % [inv["name"], owned, inv["description"], _fmt(cost)]
+	var total_in: float = GameManager.get_total_invested_in(index)
+	var income: float = float(owned) * inv["income_per_sec"]
+
+	if owned == 0:
+		btn.text = "%s\n%s\nBuy first: $%s" % [inv["name"], inv["description"], _fmt(cost)]
+	else:
+		btn.text = "%s  [x%d]  |  Total in: $%s  |  +$%s/day\nNext: $%s" % [
+			inv["name"], owned, _fmt(total_in), _fmt(income), _fmt(cost)
+		]
 	btn.disabled = not GameManager.can_afford_investment(index)
 
 
@@ -175,6 +202,16 @@ func _refresh_strategy_button(index: int) -> void:
 		btn.disabled = not GameManager.can_afford_strategy(index)
 
 
+func _refresh_retirement() -> void:
+	var years_elapsed: float = GameManager.game_days / 365.0
+	var years_remaining: float = max(0.0, 65.0 - years_elapsed)
+	var estimate: float = GameManager.get_retirement_estimate()
+	if years_remaining <= 0.0:
+		retirement_label.text = "RETIRED!  Nest egg: $%s" % _fmt(estimate)
+	else:
+		retirement_label.text = "Retire in ~%dyr  ·  est. $%s" % [int(ceil(years_remaining)), _fmt(estimate)]
+
+
 func _refresh_all_buttons() -> void:
 	for i in range(GameManager.CAREERS.size()):
 		_refresh_career_button(i)
@@ -186,9 +223,14 @@ func _refresh_all_buttons() -> void:
 
 func _refresh_ui() -> void:
 	resource_label.text = "$" + _fmt(GameManager.resources)
-	tap_label.text = "$%s / tap" % _fmt(GameManager.tap_value)
+	tap_label.text = "$%s / hr" % _fmt(GameManager.tap_value)
 	if GameManager.passive_rate > 0.0:
-		per_sec_label.text = "$%s / sec" % _fmt(GameManager.passive_rate)
+		per_sec_label.text = "$%s / day" % _fmt(GameManager.passive_rate)
+	var portfolio_val: float = GameManager.total_invested + GameManager.total_dividends_earned
+	portfolio_label.text = "Portfolio: $%s  |  Dividends: $%s" % [
+		_fmt(portfolio_val), _fmt(GameManager.total_dividends_earned)
+	]
+	_refresh_retirement()
 	_refresh_all_buttons()
 
 

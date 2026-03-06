@@ -17,6 +17,10 @@ var resources:   float = 0.0
 var passive_rate: float = 0.0
 var tap_value:   float = 1.0
 
+var game_days:            float = 0.0  # 1 real second = 1 game day
+var total_invested:       float = 0.0  # cumulative cash put into investments
+var total_dividends_earned: float = 0.0  # cumulative passive income received
+
 var careers_purchased:    Array = []  # bool — one-time career upgrades
 var investments_owned:    Array = []  # int  — repeatable investment purchases
 var strategies_purchased: Array = []  # bool — one-time passive multipliers
@@ -149,8 +153,14 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	game_days += delta
+	EventBus.game_days_changed.emit(game_days)
 	if passive_rate > 0.0:
-		add_resources(passive_rate * delta)
+		var earned: float = passive_rate * delta
+		resources += earned
+		total_dividends_earned += earned
+		EventBus.resource_changed.emit(resources)
+		EventBus.portfolio_changed.emit(total_invested, total_dividends_earned)
 
 
 # -------------------------------------------------------
@@ -198,12 +208,31 @@ func can_afford_investment(index: int) -> bool:
 func buy_investment(index: int) -> void:
 	if not can_afford_investment(index):
 		return
-	resources -= get_investment_cost(index)
+	var cost: float = get_investment_cost(index)
+	resources -= cost
+	total_invested += cost
 	investments_owned[index] += 1
 	_recalculate_passive_rate()
 	EventBus.investment_purchased.emit(index)
 	EventBus.resource_changed.emit(resources)
+	EventBus.portfolio_changed.emit(total_invested, total_dividends_earned)
 	SaveManager.save()
+
+
+# Sum of geometric series: base * (r^n - 1) / (r - 1)
+func get_total_invested_in(index: int) -> float:
+	var n: int = investments_owned[index]
+	if n == 0:
+		return 0.0
+	var inv: Dictionary = INVESTMENTS[index]
+	return inv["base_cost"] * (pow(inv["growth_rate"], float(n)) - 1.0) / (inv["growth_rate"] - 1.0)
+
+
+# Rough projection: current assets + passive at today's rate for remaining years
+func get_retirement_estimate() -> float:
+	var years_remaining: float = max(1.0, 65.0 - (game_days / 365.0))
+	var projected_passive: float = passive_rate * years_remaining * 365.0
+	return resources + total_invested + total_dividends_earned + projected_passive
 
 
 # --- Strategies ---
@@ -246,7 +275,10 @@ func _load_game() -> void:
 	if data.is_empty():
 		return
 
-	resources = float(data.get("resources", 0.0))
+	resources             = float(data.get("resources", 0.0))
+	game_days             = float(data.get("game_days", 0.0))
+	total_invested        = float(data.get("total_invested", 0.0))
+	total_dividends_earned = float(data.get("total_dividends_earned", 0.0))
 
 	var saved_careers: Array = data.get("careers_purchased", [])
 	for i in range(min(saved_careers.size(), careers_purchased.size())):

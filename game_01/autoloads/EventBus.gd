@@ -13,3 +13,6 @@ signal investment_purchased(index: int)
 signal strategy_purchased(index: int)
 
 signal offline_income_collected(amount: float)
+
+signal game_days_changed(days: float)
+signal portfolio_changed(total_invested: float, dividends_earned: float)
