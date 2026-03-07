@@ -152,6 +152,23 @@ func _ready() -> void:
 	_load_game()
 
 
+func reset() -> void:
+	resources              = 0.0
+	passive_rate           = 0.0
+	tap_value              = 1.0
+	game_days              = 0.0
+	total_invested         = 0.0
+	total_dividends_earned = 0.0
+	careers_purchased.fill(false)
+	investments_owned.fill(0)
+	strategies_purchased.fill(false)
+	EventBus.resource_changed.emit(resources)
+	EventBus.tap_value_changed.emit(tap_value)
+	EventBus.passive_rate_changed.emit(passive_rate)
+	EventBus.game_days_changed.emit(game_days)
+	EventBus.portfolio_changed.emit(total_invested, total_dividends_earned)
+
+
 func _process(delta: float) -> void:
 	game_days += delta
 	EventBus.game_days_changed.emit(game_days)
