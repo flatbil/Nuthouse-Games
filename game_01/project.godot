@@ -25,6 +25,7 @@ config/icon="res://icon.svg"
 EventBus="*res://autoloads/EventBus.gd"
 SaveManager="*res://autoloads/SaveManager.gd"
 GameManager="*res://autoloads/GameManager.gd"
+AdManager="*res://autoloads/AdManager.gd"
 
 [display]
 

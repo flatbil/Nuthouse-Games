@@ -38,6 +38,8 @@ var _section_indicators:     Dictionary = {}  # key → Label ($)
 var _section_had_affordable: Dictionary = {}  # key → bool
 var _bob_tweens:             Dictionary = {}  # key → Tween
 
+var _loan_btn: Button = null
+
 var _idle_timer:   float = 0.0
 var _idle_showing: bool  = false
 var _idle_tween:   Tween = null
@@ -64,6 +66,7 @@ func _ready() -> void:
 	EventBus.offline_income_collected.connect(_on_offline_income)
 	EventBus.game_days_changed.connect(_on_game_days_changed)
 	EventBus.portfolio_changed.connect(_on_portfolio_changed)
+	AdManager.loan_rewarded.connect(_on_loan_rewarded)
 
 	_apply_theme()
 	_build_lists()
@@ -77,6 +80,7 @@ func _process(delta: float) -> void:
 	_idle_timer += delta
 	if not _idle_showing and _idle_timer >= 10.0:
 		_show_idle_hint()
+	_refresh_loan_button()
 
 
 # -------------------------------------------------------
@@ -213,7 +217,9 @@ func _set_btn(btn: Button, t: String, disabled: bool) -> void:
 func _build_lists() -> void:
 	for child in upgrade_list.get_children():
 		child.queue_free()
+	_loan_btn = null
 
+	_add_loan_button()
 	_add_section("career")
 	for i in range(GameManager.CAREERS.size()):
 		var btn := _make_btn(52)
@@ -240,6 +246,36 @@ func _build_lists() -> void:
 
 	if OS.is_debug_build():
 		_add_debug_buttons()
+
+
+func _add_loan_button() -> void:
+	var btn := _make_btn(52)
+	btn.name = "LoanButton"
+	btn.pressed.connect(_on_loan_pressed)
+	btn.add_theme_color_override("font_color", _GOLD)
+	upgrade_list.add_child(btn)
+	_loan_btn = btn
+	_refresh_loan_button()
+
+
+func _refresh_loan_button() -> void:
+	if _loan_btn == null or not is_instance_valid(_loan_btn):
+		return
+	var inner := _loan_btn.get_node_or_null("InnerLabel") as Label
+	if AdManager.can_request_loan():
+		_set_btn(_loan_btn, "Student Loan — Watch Ad → +$100K", false)
+		if inner:
+			inner.add_theme_color_override("font_color", _GOLD)
+	else:
+		_set_btn(_loan_btn, "Student Loan — Ready in %s" % AdManager.cooldown_label(), true)
+
+
+func _on_loan_pressed() -> void:
+	AdManager.request_loan()
+
+
+func _on_loan_rewarded(amount: float) -> void:
+	_spawn_upgrade_burst(($UpgradeDrawer as Control).global_position + Vector2(($UpgradeDrawer as Control).size.x * 0.5, 40.0))
 
 
 func _add_debug_buttons() -> void:
