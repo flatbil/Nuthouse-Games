@@ -1,0 +1,114 @@
+[gd_scene format=3 uid="uid://idle_template_main"]
+
+[ext_resource type="Script" path="res://scenes/Game.gd" id="1_game"]
+
+[node name="Game" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_game")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.937, 0.984, 0.937, 1)
+mouse_filter = 2
+
+[node name="StageLabel" type="Label" parent="."]
+layout_mode = 1
+anchor_left = 0.0
+anchor_top = 0.25
+anchor_right = 1.0
+anchor_bottom = 0.65
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 40
+theme_override_colors/font_color = Color(0.2, 0.55, 0.25, 1)
+text = "Starting Out"
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+
+[node name="TopHUD" type="PanelContainer" parent="."]
+layout_mode = 1
+anchor_right = 1.0
+offset_top = 36.0
+offset_bottom = 262.0
+mouse_filter = 2
+
+[node name="Stats" type="VBoxContainer" parent="TopHUD"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="ResourceLabel" type="Label" parent="TopHUD/Stats"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 48
+theme_override_colors/font_color = Color(0.106, 0.369, 0.125, 1)
+text = "$0.00"
+horizontal_alignment = 1
+
+[node name="SalaryLabel" type="Label" parent="TopHUD/Stats"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.13, 0.13, 0.13, 1)
+horizontal_alignment = 1
+text = "..."
+
+[node name="PerSecLabel" type="Label" parent="TopHUD/Stats"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.13, 0.13, 0.13, 1)
+horizontal_alignment = 1
+
+[node name="DaysLabel" type="Label" parent="TopHUD/Stats"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.35, 0.35, 0.35, 1)
+horizontal_alignment = 1
+text = "Day 0  ·  Year 0"
+
+[node name="PortfolioLabel" type="Label" parent="TopHUD/Stats"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.35, 0.35, 0.35, 1)
+horizontal_alignment = 1
+text = "Portfolio: $0.00  |  Dividends: $0.00"
+
+[node name="RetirementLabel" type="Label" parent="TopHUD/Stats"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.35, 0.35, 0.35, 1)
+horizontal_alignment = 1
+text = "Retire in ~65yr  ·  est. $0.00"
+
+[node name="UpgradeDrawer" type="PanelContainer" parent="."]
+layout_mode = 1
+anchor_left = 0.0
+anchor_top = 0.54
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UpgradeDrawer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+scroll_deadzone = 20
+
+[node name="UpgradeList" type="VBoxContainer" parent="UpgradeDrawer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
