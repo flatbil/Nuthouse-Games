@@ -10,10 +10,14 @@ extends Node
 #   4. Change package name in project.godot
 #   5. Ship
 #
-# Three-track system — maps to almost every idle game:
-#   TRACK_A  one-time tap boosters    (e.g. Careers, Vehicles, Tiers)
-#   TRACK_B  repeatable generators    (e.g. Investments, Routes, Factories)
-#   TRACK_C  one-time multipliers     (e.g. Strategies, Logistics, Automation)
+# Four-track system — maps to almost every idle game:
+#   TRACK_A  one-time tap boosters         (e.g. Careers, Vehicles, Tiers)
+#   TRACK_B  repeatable generators         (e.g. Investments, Routes, Factories)
+#   TRACK_C  one-time passive multipliers  (e.g. Strategies, Logistics, Automation)
+#   TRACK_D  one-time tap multipliers      (e.g. Raises, Upgrades, Power-ups)
+#
+# TRACK_D keeps tapping relevant at late game when passive income (TRACK_B × TRACK_C)
+# would otherwise make manual taps feel worthless.
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -64,6 +68,7 @@ const GOAL_AGE            := 65.0            # target age in game-years
 const TRACK_A_TITLE := "CAREER"
 const TRACK_B_TITLE := "INVESTMENTS"
 const TRACK_C_TITLE := "STRATEGIES"
+const TRACK_D_TITLE := "RAISES"
 
 
 # ── Wealth / Progress Stages ───────────────────────────────────
@@ -190,6 +195,51 @@ const TRACK_C: Array = [
 		"description": "5x all investment income",
 		"cost":        20_000_000.0,
 		"multiplier":  5.0,
+	},
+]
+
+
+# ── Track D — one-time tap multipliers ────────────────────────
+# Each item multiplies tap income (TRACK_A bonuses × this multiplier).
+# Keeps manual tapping competitive with passive income at late game.
+# Required keys: name, description, cost (float), multiplier (float)
+
+const TRACK_D: Array = [
+	{
+		"name":        "Performance Review",
+		"description": "2x tap income",
+		"cost":        2_000_000.0,
+		"multiplier":  2.0,
+	},
+	{
+		"name":        "Raise Negotiation",
+		"description": "3x tap income",
+		"cost":        25_000_000.0,
+		"multiplier":  3.0,
+	},
+	{
+		"name":        "Equity Package",
+		"description": "5x tap income",
+		"cost":        250_000_000.0,
+		"multiplier":  5.0,
+	},
+	{
+		"name":        "Stock Options Vest",
+		"description": "8x tap income",
+		"cost":        2_500_000_000.0,
+		"multiplier":  8.0,
+	},
+	{
+		"name":        "Board Compensation",
+		"description": "15x tap income",
+		"cost":        25_000_000_000.0,
+		"multiplier":  15.0,
+	},
+	{
+		"name":        "Billionaire Salary",
+		"description": "25x tap income",
+		"cost":        250_000_000_000.0,
+		"multiplier":  25.0,
 	},
 ]
 

@@ -5,10 +5,11 @@ extends Control
 # Calls GameManager for all state changes.
 # All game-specific strings and colors come from GameConfig.
 #
-# Three generic sections map to GameConfig tracks:
+# Four generic sections map to GameConfig tracks:
 #   "track_0" → TRACK_A (one-time tap boosters)
 #   "track_1" → TRACK_B (repeatable generators)
-#   "track_2" → TRACK_C (one-time multipliers)
+#   "track_2" → TRACK_C (one-time passive multipliers)
+#   "track_3" → TRACK_D (one-time tap multipliers)
 # -------------------------------------------------------
 
 @onready var resource_label:   Label         = $TopHUD/Stats/ResourceLabel
@@ -20,11 +21,12 @@ extends Control
 @onready var upgrade_list:     VBoxContainer = $UpgradeDrawer/ScrollContainer/UpgradeList
 @onready var stage_label:      Label         = $StageLabel
 
-# Section collapse state — keys are "track_0", "track_1", "track_2"
+# Section collapse state — keys are "track_0" … "track_3"
 var _collapsed: Dictionary = {
 	"track_0": true,
 	"track_1": true,
 	"track_2": true,
+	"track_3": true,
 }
 
 const _BURST_COUNT := 8
@@ -93,7 +95,7 @@ func _input(event: InputEvent) -> void:
 	if $UpgradeDrawer.get_global_rect().has_point(pos):
 		return
 	GameManager.tap()
-	_spawn_tap_label(pos, GameManager.tap_value)
+	_spawn_tap_label(pos, GameManager.get_effective_tap_value())
 
 
 # -------------------------------------------------------
@@ -112,10 +114,10 @@ func _on_passive_rate_changed(rate: float) -> void:
 	_refresh_retirement()
 
 
-func _on_tap_value_changed(val: float) -> void:
+func _on_tap_value_changed(_val: float) -> void:
 	salary_label.text = "%s: %s" % [
 		GameConfig.TAP_STAT_LABEL,
-		_cur(val * GameConfig.TAP_STAT_MULTIPLIER)
+		_cur(GameManager.get_effective_tap_value() * GameConfig.TAP_STAT_MULTIPLIER)
 	]
 
 
@@ -195,7 +197,7 @@ func _build_lists() -> void:
 
 	_add_loan_button()
 
-	var tracks := [GameConfig.TRACK_A, GameConfig.TRACK_B, GameConfig.TRACK_C]
+	var tracks := [GameConfig.TRACK_A, GameConfig.TRACK_B, GameConfig.TRACK_C, GameConfig.TRACK_D]
 	for track in range(tracks.size()):
 		_add_section(track)
 		var min_h: int = 60 if track == 1 else 52   # Track B buttons are taller (more text)
@@ -233,7 +235,7 @@ func _section_container(track: int) -> VBoxContainer:
 
 
 func _track_title(track: int) -> String:
-	return ([GameConfig.TRACK_A_TITLE, GameConfig.TRACK_B_TITLE, GameConfig.TRACK_C_TITLE] as Array)[track]
+	return ([GameConfig.TRACK_A_TITLE, GameConfig.TRACK_B_TITLE, GameConfig.TRACK_C_TITLE, GameConfig.TRACK_D_TITLE] as Array)[track]
 
 
 func _section_label(key: String) -> String:
@@ -299,7 +301,7 @@ func _refresh_track_button(track: int, index: int) -> void:
 					item["name"], owned, _cur(total_in), _cur(income), _cur(cost)
 				]
 			_set_btn(btn, t, not GameManager.can_afford(1, index))
-		2:   # one-time multipliers
+		2:   # one-time passive multipliers
 			var item: Dictionary = GameConfig.TRACK_C[index]
 			if GameManager.track_c_purchased[index]:
 				_set_btn(btn, "%s  [Active]" % item["name"], true)
@@ -307,6 +309,14 @@ func _refresh_track_button(track: int, index: int) -> void:
 				_set_btn(btn,
 					"%s — %s — Cost: %s" % [item["name"], item["description"], _cur(item["cost"])],
 					not GameManager.can_afford(2, index))
+		3:   # one-time tap multipliers
+			var item: Dictionary = GameConfig.TRACK_D[index]
+			if GameManager.track_d_purchased[index]:
+				_set_btn(btn, "%s  [Active]" % item["name"], true)
+			else:
+				_set_btn(btn,
+					"%s — %s — Cost: %s" % [item["name"], item["description"], _cur(item["cost"])],
+					not GameManager.can_afford(3, index))
 
 
 func _refresh_retirement() -> void:
@@ -322,7 +332,7 @@ func _refresh_retirement() -> void:
 
 
 func _refresh_all_buttons() -> void:
-	var sizes := [GameConfig.TRACK_A.size(), GameConfig.TRACK_B.size(), GameConfig.TRACK_C.size()]
+	var sizes := [GameConfig.TRACK_A.size(), GameConfig.TRACK_B.size(), GameConfig.TRACK_C.size(), GameConfig.TRACK_D.size()]
 	for track in range(sizes.size()):
 		for i in range(sizes[track]):
 			_refresh_track_button(track, i)
@@ -332,7 +342,7 @@ func _refresh_ui() -> void:
 	resource_label.text = _cur(GameManager.resources)
 	salary_label.text   = "%s: %s" % [
 		GameConfig.TAP_STAT_LABEL,
-		_cur(GameManager.tap_value * GameConfig.TAP_STAT_MULTIPLIER)
+		_cur(GameManager.get_effective_tap_value() * GameConfig.TAP_STAT_MULTIPLIER)
 	]
 	if GameManager.passive_rate > 0.0:
 		per_sec_label.text = "%s / day" % _cur(GameManager.passive_rate)
@@ -587,7 +597,7 @@ func _update_section_indicators() -> void:
 
 func _has_affordable(key: String) -> bool:
 	var track := int(key.substr(6))
-	var sizes := [GameConfig.TRACK_A.size(), GameConfig.TRACK_B.size(), GameConfig.TRACK_C.size()]
+	var sizes := [GameConfig.TRACK_A.size(), GameConfig.TRACK_B.size(), GameConfig.TRACK_C.size(), GameConfig.TRACK_D.size()]
 	for i in range(sizes[track]):
 		if GameManager.can_afford(track, i):
 			return true
@@ -599,7 +609,7 @@ func _find_best_affordable_btn(key: String) -> Button:
 	var container := upgrade_list.get_node_or_null("Section_%s" % key) as VBoxContainer
 	if container == null:
 		return null
-	var sizes     := [GameConfig.TRACK_A.size(), GameConfig.TRACK_B.size(), GameConfig.TRACK_C.size()]
+	var sizes     := [GameConfig.TRACK_A.size(), GameConfig.TRACK_B.size(), GameConfig.TRACK_C.size(), GameConfig.TRACK_D.size()]
 	var best_idx  := -1
 	var best_cost := 0.0
 	for i in range(sizes[track]):

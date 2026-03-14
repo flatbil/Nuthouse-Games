@@ -5,10 +5,11 @@ extends Node
 # Reads all content data from GameConfig — do not put
 # game-specific values in this file.
 #
-# Three tracks (configured in GameConfig):
-#   TRACK_A — one-time tap boosters   (e.g. careers)
-#   TRACK_B — repeatable generators   (e.g. investments)
-#   TRACK_C — one-time multipliers    (e.g. strategies)
+# Four tracks (configured in GameConfig):
+#   TRACK_A — one-time tap boosters        (e.g. careers)
+#   TRACK_B — repeatable generators        (e.g. investments)
+#   TRACK_C — one-time passive multipliers (e.g. strategies)
+#   TRACK_D — one-time tap multipliers     (e.g. raises)
 # -------------------------------------------------------
 
 var resources:              float = 0.0
@@ -21,7 +22,8 @@ var total_dividends_earned: float = 0.0
 
 var track_a_purchased: Array = []   # bool — one-time tap boosters
 var track_b_owned:     Array = []   # int  — repeatable generators
-var track_c_purchased: Array = []   # bool — one-time multipliers
+var track_c_purchased: Array = []   # bool — one-time passive multipliers
+var track_d_purchased: Array = []   # bool — one-time tap multipliers
 
 
 func _ready() -> void:
@@ -31,6 +33,8 @@ func _ready() -> void:
 	track_b_owned.fill(0)
 	track_c_purchased.resize(GameConfig.TRACK_C.size())
 	track_c_purchased.fill(false)
+	track_d_purchased.resize(GameConfig.TRACK_D.size())
+	track_d_purchased.fill(false)
 	_load_game()
 
 
@@ -44,6 +48,7 @@ func reset() -> void:
 	track_a_purchased.fill(false)
 	track_b_owned.fill(0)
 	track_c_purchased.fill(false)
+	track_d_purchased.fill(false)
 	EventBus.resource_changed.emit(resources)
 	EventBus.tap_value_changed.emit(tap_value)
 	EventBus.passive_rate_changed.emit(passive_rate)
@@ -67,7 +72,7 @@ func _process(delta: float) -> void:
 # -------------------------------------------------------
 
 func tap() -> void:
-	add_resources(tap_value)
+	add_resources(get_effective_tap_value())
 	game_days += 1.0 / 24.0   # 1 tap = 1 game hour
 	EventBus.game_days_changed.emit(game_days)
 
@@ -88,6 +93,8 @@ func get_item_cost(track: int, index: int) -> float:
 			return item["base_cost"] * pow(item["growth_rate"], float(track_b_owned[index]))
 		2:
 			return float(GameConfig.TRACK_C[index]["cost"])
+		3:
+			return float(GameConfig.TRACK_D[index]["cost"])
 	return 0.0
 
 
@@ -99,6 +106,8 @@ func can_afford(track: int, index: int) -> bool:
 			return resources >= get_item_cost(1, index)
 		2:
 			return resources >= get_item_cost(2, index) and not track_c_purchased[index]
+		3:
+			return resources >= get_item_cost(3, index) and not track_d_purchased[index]
 	return false
 
 
@@ -121,10 +130,25 @@ func buy_item(track: int, index: int) -> void:
 		2:
 			track_c_purchased[index] = true
 			_recalculate_passive_rate()
+		3:
+			track_d_purchased[index] = true
+			EventBus.tap_value_changed.emit(tap_value)
 
 	EventBus.item_purchased.emit(track, index)
 	EventBus.resource_changed.emit(resources)
 	SaveManager.save()
+
+
+func get_tap_multiplier() -> float:
+	var mult := 1.0
+	for i in range(GameConfig.TRACK_D.size()):
+		if track_d_purchased[i]:
+			mult *= float(GameConfig.TRACK_D[i]["multiplier"])
+	return mult
+
+
+func get_effective_tap_value() -> float:
+	return tap_value * get_tap_multiplier()
 
 
 # Sum of geometric series for Track B: base * (r^n - 1) / (r - 1)
@@ -182,6 +206,10 @@ func _load_game() -> void:
 	var saved_c: Array = data.get("track_c_purchased", [])
 	for i in range(min(saved_c.size(), track_c_purchased.size())):
 		track_c_purchased[i] = bool(saved_c[i])
+
+	var saved_d: Array = data.get("track_d_purchased", [])
+	for i in range(min(saved_d.size(), track_d_purchased.size())):
+		track_d_purchased[i] = bool(saved_d[i])
 
 	# Rebuild tap_value from Track A purchases
 	tap_value = 1.0
