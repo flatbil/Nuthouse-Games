@@ -16,14 +16,17 @@ extends Node
 # -------------------------------------------------------
 
 signal loan_rewarded(amount: float)
+signal career_finish_rewarded(index: int)
 
 const LOAN_AMOUNT:      float = 100_000.0
 const COOLDOWN_SECONDS: float = 300.0          # 5 minutes
 const AD_UNIT_ID:       String = "ca-app-pub-3940256099942544/5224354917"  # AdMob test ID
 
-var cooldown_remaining: float = 0.0
-var _ad_ready:          bool  = false
-var _admob                    = null
+var cooldown_remaining:  float  = 0.0
+var _ad_ready:           bool   = false
+var _admob                      = null
+var _pending_type:       String = ""   # "loan" or "career_finish"
+var _pending_career_idx: int    = -1
 
 
 func _ready() -> void:
@@ -48,16 +51,28 @@ func _process(delta: float) -> void:
 # -------------------------------------------------------
 
 func can_request_loan() -> bool:
-	return cooldown_remaining <= 0.0
+	return cooldown_remaining <= 0.0 and _pending_type == ""
 
 
 func request_loan() -> void:
 	if not can_request_loan():
 		return
+	_pending_type = "loan"
 	if _admob != null and _ad_ready:
 		_admob.show_rewarded_ad()
 	else:
 		# No plugin or ad not loaded — grant immediately (debug / editor)
+		_grant_reward()
+
+
+func request_career_finish(career_index: int) -> void:
+	if _pending_type != "":
+		return  # another ad already in progress
+	_pending_career_idx = career_index
+	_pending_type = "career_finish"
+	if _admob != null and _ad_ready:
+		_admob.show_rewarded_ad()
+	else:
 		_grant_reward()
 
 
@@ -90,10 +105,17 @@ func _on_user_earned_reward(_currency: String, _amount: int) -> void:
 # -------------------------------------------------------
 
 func _grant_reward() -> void:
-	cooldown_remaining = COOLDOWN_SECONDS
 	_ad_ready = false
-	GameManager.add_resources(LOAN_AMOUNT)
-	loan_rewarded.emit(LOAN_AMOUNT)
+	match _pending_type:
+		"loan":
+			cooldown_remaining = COOLDOWN_SECONDS
+			GameManager.add_resources(LOAN_AMOUNT)
+			loan_rewarded.emit(LOAN_AMOUNT)
+		"career_finish":
+			GameManager.finish_career_now(_pending_career_idx)
+			career_finish_rewarded.emit(_pending_career_idx)
+	_pending_type = ""
+	_pending_career_idx = -1
 	if _admob != null:
 		_load_ad()
 

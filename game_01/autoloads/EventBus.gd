@@ -11,8 +11,11 @@ signal tap_value_changed(new_tap_value: float)
 signal career_purchased(index: int)
 signal investment_purchased(index: int)
 signal strategy_purchased(index: int)
+signal venture_purchased(index: int)
+signal investor_purchased(index: int)
 
 signal offline_income_collected(amount: float)
 
 signal game_days_changed(days: float)
 signal portfolio_changed(total_invested: float, dividends_earned: float)
+signal game_ended()

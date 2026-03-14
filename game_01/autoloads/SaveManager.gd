@@ -20,8 +20,11 @@ func save() -> void:
 		"total_invested": GameManager.total_invested,
 		"total_dividends_earned": GameManager.total_dividends_earned,
 		"careers_purchased": GameManager.careers_purchased,
+		"careers_in_progress": GameManager.careers_in_progress,
 		"investments_owned": GameManager.investments_owned,
 		"strategies_purchased": GameManager.strategies_purchased,
+		"ventures_purchased": GameManager.ventures_purchased,
+		"investors_purchased": GameManager.investors_purchased,
 		"last_save_time": Time.get_unix_time_from_system(),
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)

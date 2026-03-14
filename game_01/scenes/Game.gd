@@ -8,25 +8,31 @@ extends Control
 # own events normally.
 # -------------------------------------------------------
 
-@onready var resource_label:   Label         = $TopHUD/Stats/ResourceLabel
-@onready var salary_label:     Label         = $TopHUD/Stats/SalaryLabel
-@onready var per_sec_label:    Label         = $TopHUD/Stats/PerSecLabel
-@onready var days_label:       Label         = $TopHUD/Stats/DaysLabel
-@onready var portfolio_label:  Label         = $TopHUD/Stats/PortfolioLabel
-@onready var retirement_label: Label         = $TopHUD/Stats/RetirementLabel
-@onready var upgrade_list:     VBoxContainer = $UpgradeDrawer/ScrollContainer/UpgradeList
-@onready var stage_label:      Label         = $StageLabel
+@onready var resource_label:   Label               = $TopHUD/Stats/ResourceLabel
+@onready var salary_label:     Label               = $TopHUD/Stats/SalaryLabel
+@onready var per_sec_label:    Label               = $TopHUD/Stats/PerSecLabel
+@onready var days_label:       Label               = $TopHUD/Stats/DaysLabel
+@onready var portfolio_label:  Label               = $TopHUD/Stats/PortfolioLabel
+@onready var retirement_label: Label               = $TopHUD/Stats/RetirementLabel
+@onready var upgrade_list:     VBoxContainer       = $UpgradeDrawer/ScrollContainer/UpgradeList
+@onready var stage_label:      Label               = $StageLabel
+@onready var _coin_sfx:        AudioStreamPlayer   = $CoinSound
+@onready var _tada_sfx:        AudioStreamPlayer   = $TadaSound
 
 var _collapsed: Dictionary = {
 	"career":      true,
 	"investments": true,
 	"strategies":  true,
+	"ventures":    true,
+	"investors":   true,
 }
 
 const _TITLES: Dictionary = {
 	"career":      "CAREER",
 	"investments": "INVESTMENTS",
 	"strategies":  "STRATEGIES",
+	"ventures":    "VENTURES",
+	"investors":   "INVESTORS",
 }
 
 const _MONEY_GREEN    := Color(0.106, 0.369, 0.125, 1.0)
@@ -39,6 +45,10 @@ var _section_had_affordable: Dictionary = {}  # key → bool
 var _bob_tweens:             Dictionary = {}  # key → Tween
 
 var _loan_btn: Button = null
+var _career_refresh_timer: float = 0.0
+
+var _settings_overlay:  Control = null
+var _settings_visible:  bool    = false
 
 var _idle_timer:   float = 0.0
 var _idle_showing: bool  = false
@@ -53,6 +63,11 @@ const STAGES: Array = [
 	{"threshold": 50_000_000.0,        "label": "Wealthy"},
 	{"threshold": 1_000_000_000.0,     "label": "Rich"},
 	{"threshold": 1_000_000_000_000.0, "label": "Ultra Rich"},
+	{"threshold": 1.0e15,              "label": "Corporate Empire"},
+	{"threshold": 1.0e18,              "label": "Buy-N-Large"},
+	{"threshold": 1.0e21,              "label": "Galactic Mogul"},
+	{"threshold": 1.0e24,              "label": "Universal Overlord"},
+	{"threshold": 1.0e30,              "label": "Beyond Comprehension"},
 ]
 
 
@@ -63,10 +78,13 @@ func _ready() -> void:
 	EventBus.career_purchased.connect(_on_career_purchased)
 	EventBus.investment_purchased.connect(_on_investment_purchased)
 	EventBus.strategy_purchased.connect(_on_strategy_purchased)
+	EventBus.venture_purchased.connect(_on_venture_purchased)
+	EventBus.investor_purchased.connect(_on_investor_purchased)
 	EventBus.offline_income_collected.connect(_on_offline_income)
 	EventBus.game_days_changed.connect(_on_game_days_changed)
 	EventBus.portfolio_changed.connect(_on_portfolio_changed)
 	AdManager.loan_rewarded.connect(_on_loan_rewarded)
+	EventBus.game_ended.connect(_on_game_ended)
 
 	_apply_theme()
 	_build_lists()
@@ -74,13 +92,19 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_create_section_indicators()
 	_create_idle_hint()
+	_build_settings_button()
+	_build_settings_overlay()
 
 
 func _process(delta: float) -> void:
 	_idle_timer += delta
+	_career_refresh_timer += delta
 	if not _idle_showing and _idle_timer >= 10.0:
 		_show_idle_hint()
 	_refresh_loan_button()
+	if _career_refresh_timer >= 1.0:
+		_career_refresh_timer = 0.0
+		_refresh_active_career_progress()
 
 
 # -------------------------------------------------------
@@ -93,6 +117,9 @@ func _process(delta: float) -> void:
 # -------------------------------------------------------
 
 func _input(event: InputEvent) -> void:
+	if _settings_visible:
+		return
+
 	# Dismiss idle hint on any meaningful input (before rect checks,
 	# so button taps and scroll also dismiss it)
 	if event is InputEventScreenTouch \
@@ -114,6 +141,9 @@ func _input(event: InputEvent) -> void:
 		return
 	GameManager.tap()
 	_spawn_tap_label(pos, GameManager.tap_value)
+	if _coin_sfx.stream != null and Settings.sfx_enabled:
+		_coin_sfx.volume_db = Settings.sfx_volume_db()
+		_coin_sfx.play()
 
 
 # -------------------------------------------------------
@@ -144,11 +174,35 @@ func _on_career_purchased(index: int) -> void:
 func _on_investment_purchased(index: int) -> void:
 	_refresh_investment_button(index)
 	_burst_at_upgrade("investments", "Investment_%d" % index)
+	if _tada_sfx.stream != null and Settings.sfx_enabled:
+		_tada_sfx.pitch_scale = randf_range(0.95, 1.05)
+		_tada_sfx.volume_db   = Settings.sfx_volume_db()
+		_tada_sfx.play()
 
 
 func _on_strategy_purchased(index: int) -> void:
 	_refresh_strategy_button(index)
+	_refresh_all_buttons()  # strategy multiplier affects all investment displays
 	_burst_at_upgrade("strategies", "Strategy_%d" % index)
+
+
+func _on_venture_purchased(index: int) -> void:
+	_refresh_venture_button(index)
+	_burst_at_upgrade("ventures", "Venture_%d" % index)
+	if _tada_sfx.stream != null and Settings.sfx_enabled:
+		_tada_sfx.pitch_scale = randf_range(0.95, 1.05)
+		_tada_sfx.volume_db   = Settings.sfx_volume_db()
+		_tada_sfx.play()
+
+
+func _on_investor_purchased(index: int) -> void:
+	_refresh_investor_button(index)
+	_refresh_all_buttons()  # investor multiplier affects all venture displays
+	_burst_at_upgrade("investors", "Investor_%d" % index)
+	if _tada_sfx.stream != null and Settings.sfx_enabled:
+		_tada_sfx.pitch_scale = randf_range(0.95, 1.05)
+		_tada_sfx.volume_db   = Settings.sfx_volume_db()
+		_tada_sfx.play()
 
 
 func _on_offline_income(amount: float) -> void:
@@ -158,9 +212,9 @@ func _on_offline_income(amount: float) -> void:
 
 
 func _on_game_days_changed(days: float) -> void:
-	var years: int       = int(days / 365.0)
+	var age: int         = int(GameManager.START_AGE + days / 365.0)
 	var day_in_year: int = int(days) % 365
-	days_label.text = "Day %d  ·  Year %d" % [day_in_year + 1, years]
+	days_label.text = "Day %d  ·  Age %d" % [day_in_year + 1, age]
 	_refresh_retirement()
 
 
@@ -226,6 +280,12 @@ func _build_lists() -> void:
 		btn.name = "Career_%d" % i
 		btn.pressed.connect(_on_career_pressed.bind(i))
 		_section_container("career").add_child(btn)
+		var finish_btn := _make_btn(36)
+		finish_btn.name = "CareerFinish_%d" % i
+		finish_btn.visible = false
+		finish_btn.pressed.connect(_on_career_finish_pressed.bind(i))
+		(finish_btn.get_node("InnerLabel") as Label).add_theme_color_override("font_color", _GOLD)
+		_section_container("career").add_child(finish_btn)
 		_refresh_career_button(i)
 
 	_add_section("investments")
@@ -243,6 +303,22 @@ func _build_lists() -> void:
 		btn.pressed.connect(_on_strategy_pressed.bind(i))
 		_section_container("strategies").add_child(btn)
 		_refresh_strategy_button(i)
+
+	_add_section("ventures")
+	for i in range(GameManager.VENTURES.size()):
+		var btn := _make_btn(52)
+		btn.name = "Venture_%d" % i
+		btn.pressed.connect(_on_venture_pressed.bind(i))
+		_section_container("ventures").add_child(btn)
+		_refresh_venture_button(i)
+
+	_add_section("investors")
+	for i in range(GameManager.INVESTORS.size()):
+		var btn := _make_btn(52)
+		btn.name = "Investor_%d" % i
+		btn.pressed.connect(_on_investor_pressed.bind(i))
+		_section_container("investors").add_child(btn)
+		_refresh_investor_button(i)
 
 	if OS.is_debug_build():
 		_add_debug_buttons()
@@ -278,10 +354,15 @@ func _on_loan_rewarded(amount: float) -> void:
 	_spawn_upgrade_burst(($UpgradeDrawer as Control).global_position + Vector2(($UpgradeDrawer as Control).size.x * 0.5, 40.0))
 
 
+func _on_game_ended() -> void:
+	get_tree().change_scene_to_file("res://scenes/RetirementScreen.tscn")
+
+
 func _add_debug_buttons() -> void:
 	var specs := [
 		["[D] +$100K",   func(): GameManager.add_resources(100_000.0)],
 		["[D] +$1B",     func(): GameManager.add_resources(1_000_000_000.0)],
+		["[D] +10 Years", func(): GameManager.debug_advance_years(10.0)],
 		["[D] RESET",    func(): _debug_reset_game()],
 	]
 	for spec in specs:
@@ -345,7 +426,17 @@ func _toggle_section(key: String) -> void:
 
 
 func _on_career_pressed(index: int) -> void:
-	GameManager.buy_career(index)
+	GameManager.start_career(index)
+
+
+func _on_career_finish_pressed(index: int) -> void:
+	AdManager.request_career_finish(index)
+
+
+func _refresh_active_career_progress() -> void:
+	for i in range(GameManager.CAREERS.size()):
+		if GameManager.careers_in_progress[i] >= 0.0:
+			_refresh_career_button(i)
 
 
 func _on_investment_pressed(index: int) -> void:
@@ -354,6 +445,14 @@ func _on_investment_pressed(index: int) -> void:
 
 func _on_strategy_pressed(index: int) -> void:
 	GameManager.buy_strategy(index)
+
+
+func _on_venture_pressed(index: int) -> void:
+	GameManager.buy_venture(index)
+
+
+func _on_investor_pressed(index: int) -> void:
+	GameManager.buy_investor(index)
 
 
 # -------------------------------------------------------
@@ -365,13 +464,34 @@ func _refresh_career_button(index: int) -> void:
 	if container == null: return
 	var btn := container.get_node_or_null("Career_%d" % index) as Button
 	if btn == null: return
-	var c: Dictionary = GameManager.CAREERS[index]
+	var finish_btn := container.get_node_or_null("CareerFinish_%d" % index) as Button
+	var c: Dictionary  = GameManager.CAREERS[index]
+	var in_prog: float = GameManager.careers_in_progress[index]
+
 	if GameManager.careers_purchased[index]:
 		_set_btn(btn, "%s  [Completed]" % c["name"], true)
+		if finish_btn: finish_btn.visible = false
+
+	elif in_prog >= 0.0:
+		var pct: float = min(100.0, ((GameManager.game_days - in_prog) / float(c["duration_days"])) * 100.0)
+		_set_btn(btn, "Studying: %s  —  %.0f%% complete" % [c["name"], pct], true)
+		if finish_btn:
+			finish_btn.visible = true
+			_set_btn(finish_btn, "Finish Now  ·  Watch Ad", false)
+
+	elif not GameManager.career_prereq_met(index):
+		var req: int = int(c["requires"])
+		_set_btn(btn, "%s  [finish %s first]" % [c["name"], GameManager.CAREERS[req]["name"]], true)
+		if finish_btn: finish_btn.visible = false
+
 	else:
+		var dur_days: float = float(c["duration_days"])
+		var dur_str: String = ("~%d yr" % int(round(dur_days / 365.0))) if dur_days >= 365.0 \
+			else ("~%d mo" % int(round(dur_days / 30.0)))
 		_set_btn(btn,
-			"%s — %s — Cost: $%s" % [c["name"], c["description"], _fmt(c["cost"])],
-			not GameManager.can_afford_career(index))
+			"%s — %s — $%s  ·  %s" % [c["name"], c["description"], _fmt(c["cost"]), dur_str],
+			not GameManager.can_start_career(index))
+		if finish_btn: finish_btn.visible = false
 
 
 func _refresh_investment_button(index: int) -> void:
@@ -383,13 +503,14 @@ func _refresh_investment_button(index: int) -> void:
 	var owned: int      = GameManager.investments_owned[index]
 	var cost: float     = GameManager.get_investment_cost(index)
 	var total_in: float = GameManager.get_total_invested_in(index)
-	var income: float   = float(owned) * inv["income_per_sec"]
+	# Show effective income including strategy multipliers
+	var effective: float = float(owned) * inv["income_per_sec"] * GameManager.get_strategy_multiplier()
 	var t: String
 	if owned == 0:
 		t = "%s — %s — Buy: $%s" % [inv["name"], inv["description"], _fmt(cost)]
 	else:
 		t = "%s [x%d] | In: $%s | +$%s/day | Next: $%s" % [
-			inv["name"], owned, _fmt(total_in), _fmt(income), _fmt(cost)
+			inv["name"], owned, _fmt(total_in), _fmt(effective), _fmt(cost)
 		]
 	_set_btn(btn, t, not GameManager.can_afford_investment(index))
 
@@ -408,9 +529,38 @@ func _refresh_strategy_button(index: int) -> void:
 			not GameManager.can_afford_strategy(index))
 
 
+func _refresh_venture_button(index: int) -> void:
+	var container := upgrade_list.get_node_or_null("Section_ventures") as VBoxContainer
+	if container == null: return
+	var btn := container.get_node_or_null("Venture_%d" % index) as Button
+	if btn == null: return
+	var v: Dictionary = GameManager.VENTURES[index]
+	if GameManager.ventures_purchased[index]:
+		var effective: float = v["income_per_day"] * GameManager.get_investor_multiplier()
+		_set_btn(btn, "%s  [Active — +$%s/day]" % [v["name"], _fmt(effective)], true)
+	else:
+		_set_btn(btn,
+			"%s — %s — Cost: $%s" % [v["name"], v["description"], _fmt(v["cost"])],
+			not GameManager.can_afford_venture(index))
+
+
+func _refresh_investor_button(index: int) -> void:
+	var container := upgrade_list.get_node_or_null("Section_investors") as VBoxContainer
+	if container == null: return
+	var btn := container.get_node_or_null("Investor_%d" % index) as Button
+	if btn == null: return
+	var inv: Dictionary = GameManager.INVESTORS[index]
+	if GameManager.investors_purchased[index]:
+		_set_btn(btn, "%s  [Active]" % inv["name"], true)
+	else:
+		_set_btn(btn,
+			"%s — %s — Cost: $%s" % [inv["name"], inv["description"], _fmt(inv["cost"])],
+			not GameManager.can_afford_investor(index))
+
+
 func _refresh_retirement() -> void:
-	var years_elapsed: float   = GameManager.game_days / 365.0
-	var years_remaining: float = max(0.0, 65.0 - years_elapsed)
+	var age_now: float         = GameManager.START_AGE + GameManager.game_days / 365.0
+	var years_remaining: float = max(0.0, GameManager.RETIRE_AGE - age_now)
 	var estimate: float        = GameManager.get_retirement_estimate()
 	if years_remaining <= 0.0:
 		retirement_label.text = "RETIRED!  Nest egg: $%s" % _fmt(estimate)
@@ -427,6 +577,10 @@ func _refresh_all_buttons() -> void:
 		_refresh_investment_button(i)
 	for i in range(GameManager.STRATEGIES.size()):
 		_refresh_strategy_button(i)
+	for i in range(GameManager.VENTURES.size()):
+		_refresh_venture_button(i)
+	for i in range(GameManager.INVESTORS.size()):
+		_refresh_investor_button(i)
 
 
 func _refresh_ui() -> void:
@@ -628,7 +782,7 @@ func _has_affordable(key: String) -> bool:
 	match key:
 		"career":
 			for i in range(GameManager.CAREERS.size()):
-				if GameManager.can_afford_career(i):
+				if GameManager.can_start_career(i):
 					return true
 		"investments":
 			for i in range(GameManager.INVESTMENTS.size()):
@@ -637,6 +791,14 @@ func _has_affordable(key: String) -> bool:
 		"strategies":
 			for i in range(GameManager.STRATEGIES.size()):
 				if GameManager.can_afford_strategy(i):
+					return true
+		"ventures":
+			for i in range(GameManager.VENTURES.size()):
+				if GameManager.can_afford_venture(i):
+					return true
+		"investors":
+			for i in range(GameManager.INVESTORS.size()):
+				if GameManager.can_afford_investor(i):
 					return true
 	return false
 
@@ -651,7 +813,7 @@ func _find_best_affordable_btn(key: String) -> Button:
 		"career":
 			for i in range(GameManager.CAREERS.size()):
 				var cost: float = GameManager.CAREERS[i]["cost"]
-				if GameManager.can_afford_career(i) and cost > best_cost:
+				if GameManager.can_start_career(i) and cost > best_cost:
 					best_idx = i
 					best_cost = cost
 			if best_idx >= 0:
@@ -672,6 +834,22 @@ func _find_best_affordable_btn(key: String) -> Button:
 					best_cost = cost
 			if best_idx >= 0:
 				return container.get_node_or_null("Strategy_%d" % best_idx) as Button
+		"ventures":
+			for i in range(GameManager.VENTURES.size()):
+				var cost: float = GameManager.VENTURES[i]["cost"]
+				if GameManager.can_afford_venture(i) and cost > best_cost:
+					best_idx = i
+					best_cost = cost
+			if best_idx >= 0:
+				return container.get_node_or_null("Venture_%d" % best_idx) as Button
+		"investors":
+			for i in range(GameManager.INVESTORS.size()):
+				var cost: float = GameManager.INVESTORS[i]["cost"]
+				if GameManager.can_afford_investor(i) and cost > best_cost:
+					best_idx = i
+					best_cost = cost
+			if best_idx >= 0:
+				return container.get_node_or_null("Investor_%d" % best_idx) as Button
 	return null
 
 
@@ -746,12 +924,176 @@ func _apply_theme() -> void:
 
 
 # -------------------------------------------------------
+# Settings button + overlay
+# -------------------------------------------------------
+
+func _build_settings_button() -> void:
+	var btn := Button.new()
+	btn.text = "⚙"
+	btn.custom_minimum_size = Vector2(44, 44)
+	btn.add_theme_font_size_override("font_size", 22)
+	# Anchor to top-right corner
+	btn.anchor_left   = 1.0
+	btn.anchor_right  = 1.0
+	btn.anchor_top    = 0.0
+	btn.anchor_bottom = 0.0
+	btn.offset_left   = -48.0
+	btn.offset_right  = -4.0
+	btn.offset_top    = 4.0
+	btn.offset_bottom = 48.0
+	btn.pressed.connect(_open_settings)
+	add_child(btn)
+
+
+func _build_settings_overlay() -> void:
+	_settings_overlay = Control.new()
+	_settings_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_settings_overlay.visible = false
+	add_child(_settings_overlay)
+
+	# Dim background — blocks input to game
+	var dim := ColorRect.new()
+	dim.color = Color(0.0, 0.0, 0.0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_settings_overlay.add_child(dim)
+
+	# Card panel
+	var card := PanelContainer.new()
+	card.anchor_left   = 0.08
+	card.anchor_right  = 0.92
+	card.anchor_top    = 0.22
+	card.anchor_bottom = 0.82
+	var style := StyleBoxFlat.new()
+	style.bg_color                  = Color(1.0, 1.0, 1.0, 0.97)
+	style.corner_radius_top_left    = 20
+	style.corner_radius_top_right   = 20
+	style.corner_radius_bottom_left = 20
+	style.corner_radius_bottom_right = 20
+	style.content_margin_left   = 20.0
+	style.content_margin_right  = 20.0
+	style.content_margin_top    = 16.0
+	style.content_margin_bottom = 16.0
+	card.add_theme_stylebox_override("panel", style)
+	_settings_overlay.add_child(card)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 14)
+	card.add_child(vbox)
+
+	# Title
+	var title := Label.new()
+	title.text = "Settings"
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", _MONEY_GREEN)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var sep1 := HSeparator.new()
+	vbox.add_child(sep1)
+
+	# Sound FX row
+	vbox.add_child(_make_settings_label("Sound FX"))
+	var sfx_toggle := _make_toggle_btn(Settings.sfx_enabled, func(on): Settings.set_sfx(on))
+	vbox.add_child(sfx_toggle)
+	var sfx_slider := _make_slider(Settings.sfx_volume, func(v): Settings.set_sfx_volume(v))
+	vbox.add_child(sfx_slider)
+
+	# Music row
+	vbox.add_child(_make_settings_label("Music"))
+	var music_toggle := _make_toggle_btn(Settings.music_enabled, func(on): Settings.set_music(on))
+	vbox.add_child(music_toggle)
+	var music_slider := _make_slider(Settings.music_volume, func(v): Settings.set_music_volume(v))
+	vbox.add_child(music_slider)
+
+	var sep2 := HSeparator.new()
+	vbox.add_child(sep2)
+
+	# Return to menu
+	var menu_btn := Button.new()
+	menu_btn.text = "Return to Menu"
+	menu_btn.custom_minimum_size = Vector2(0, 48)
+	menu_btn.add_theme_font_size_override("font_size", 17)
+	menu_btn.add_theme_color_override("font_color", Color(0.75, 0.15, 0.15, 1))
+	menu_btn.pressed.connect(_on_return_to_menu)
+	vbox.add_child(menu_btn)
+
+	# Resume
+	var resume_btn := Button.new()
+	resume_btn.text = "Resume"
+	resume_btn.custom_minimum_size = Vector2(0, 48)
+	resume_btn.add_theme_font_size_override("font_size", 17)
+	resume_btn.pressed.connect(_close_settings)
+	vbox.add_child(resume_btn)
+
+
+func _make_settings_label(text: String) -> Label:
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45, 1))
+	return lbl
+
+
+func _make_toggle_btn(initial: bool, callback: Callable) -> Button:
+	var btn := Button.new()
+	btn.custom_minimum_size = Vector2(0, 42)
+	btn.add_theme_font_size_override("font_size", 16)
+	_set_toggle_style(btn, initial)
+	btn.pressed.connect(func():
+		var now: bool = not bool(btn.get_meta("on"))
+		_set_toggle_style(btn, now)
+		callback.call(now)
+	)
+	return btn
+
+
+func _set_toggle_style(btn: Button, on: bool) -> void:
+	btn.set_meta("on", on)
+	btn.text = "ON" if on else "OFF"
+	btn.add_theme_color_override("font_color",
+		_MONEY_GREEN if on else Color(0.6, 0.6, 0.6, 1))
+
+
+func _make_slider(initial: float, callback: Callable) -> HSlider:
+	var slider := HSlider.new()
+	slider.min_value    = 0.0
+	slider.max_value    = 1.0
+	slider.step         = 0.01
+	slider.value        = initial
+	slider.custom_minimum_size = Vector2(0, 32)
+	slider.value_changed.connect(func(v): callback.call(v))
+	return slider
+
+
+func _open_settings() -> void:
+	_settings_visible = true
+	_settings_overlay.visible = true
+
+
+func _close_settings() -> void:
+	_settings_visible = false
+	_settings_overlay.visible = false
+
+
+func _on_return_to_menu() -> void:
+	SaveManager.save()
+	_settings_visible = false
+	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
+
+
+# -------------------------------------------------------
 # Number formatting
 # -------------------------------------------------------
 
 func _fmt(n: float) -> String:
-	if n >= 1_000_000_000_000_000.0:
-		return "%.2fQa" % (n / 1_000_000_000_000_000.0)
+	if   n >= 1.0e33: return "%.2fDc" % (n / 1.0e33)
+	elif n >= 1.0e30: return "%.2fNo" % (n / 1.0e30)
+	elif n >= 1.0e27: return "%.2fOc" % (n / 1.0e27)
+	elif n >= 1.0e24: return "%.2fSp" % (n / 1.0e24)
+	elif n >= 1.0e21: return "%.2fSx" % (n / 1.0e21)
+	elif n >= 1.0e18: return "%.2fQi" % (n / 1.0e18)
+	elif n >= 1.0e15: return "%.2fQa" % (n / 1.0e15)
 	elif n >= 1_000_000_000_000.0:
 		return "%.2fT"  % (n / 1_000_000_000_000.0)
 	elif n >= 1_000_000_000.0:
