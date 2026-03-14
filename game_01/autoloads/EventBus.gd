@@ -13,6 +13,7 @@ signal investment_purchased(index: int)
 signal strategy_purchased(index: int)
 signal venture_purchased(index: int)
 signal investor_purchased(index: int)
+signal salary_boost_purchased(index: int)
 
 signal offline_income_collected(amount: float)
 

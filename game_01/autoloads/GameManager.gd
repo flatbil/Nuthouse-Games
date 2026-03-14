@@ -22,12 +22,13 @@ var game_days:              float = 0.0
 var total_invested:         float = 0.0
 var total_dividends_earned: float = 0.0
 
-var careers_purchased:    Array = []  # bool
-var careers_in_progress:  Array = []  # float: -1.0 = not started, >= 0.0 = game_days when study began
-var investments_owned:    Array = []  # int
-var strategies_purchased: Array = []  # bool
-var ventures_purchased:   Array = []  # bool
-var investors_purchased:  Array = []  # bool
+var careers_purchased:       Array = []  # bool
+var careers_in_progress:     Array = []  # float: -1.0 = not started, >= 0.0 = game_days when study began
+var investments_owned:       Array = []  # int
+var strategies_purchased:    Array = []  # bool
+var ventures_purchased:      Array = []  # bool
+var investors_purchased:     Array = []  # bool
+var salary_boosts_purchased: Array = []  # bool
 
 # Populated in _ready() from base data + procedurally generated tiers
 var VENTURES:  Array = []
@@ -152,6 +153,49 @@ const STRATEGIES: Array = [
 		"description": "5x all investment income",
 		"cost": 20_000_000.0,
 		"multiplier": 5.0,
+	},
+]
+
+# -------------------------------------------------------
+# SALARY_BOOSTS — one-time multipliers on tap (salary) income
+# Mirrors STRATEGIES but for the career/tap track.
+# -------------------------------------------------------
+const SALARY_BOOSTS: Array = [
+	{
+		"name": "Performance Review",
+		"description": "2x tap income",
+		"cost": 2_000_000.0,
+		"multiplier": 2.0,
+	},
+	{
+		"name": "Raise Negotiation",
+		"description": "3x tap income",
+		"cost": 25_000_000.0,
+		"multiplier": 3.0,
+	},
+	{
+		"name": "Equity Package",
+		"description": "5x tap income",
+		"cost": 250_000_000.0,
+		"multiplier": 5.0,
+	},
+	{
+		"name": "Stock Options Vest",
+		"description": "8x tap income",
+		"cost": 2_500_000_000.0,
+		"multiplier": 8.0,
+	},
+	{
+		"name": "Board Compensation",
+		"description": "15x tap income",
+		"cost": 25_000_000_000.0,
+		"multiplier": 15.0,
+	},
+	{
+		"name": "Billionaire Salary",
+		"description": "25x tap income",
+		"cost": 250_000_000_000.0,
+		"multiplier": 25.0,
 	},
 ]
 
@@ -329,6 +373,8 @@ func _ready() -> void:
 	ventures_purchased.fill(false)
 	investors_purchased.resize(INVESTORS.size())
 	investors_purchased.fill(false)
+	salary_boosts_purchased.resize(SALARY_BOOSTS.size())
+	salary_boosts_purchased.fill(false)
 	_load_game()
 
 
@@ -346,6 +392,7 @@ func reset() -> void:
 	strategies_purchased.fill(false)
 	ventures_purchased.fill(false)
 	investors_purchased.fill(false)
+	salary_boosts_purchased.fill(false)
 	EventBus.resource_changed.emit(resources)
 	EventBus.tap_value_changed.emit(tap_value)
 	EventBus.passive_rate_changed.emit(passive_rate)
@@ -378,7 +425,7 @@ func _process(delta: float) -> void:
 # -------------------------------------------------------
 
 func tap() -> void:
-	add_resources(tap_value)
+	add_resources(get_effective_tap_value())
 	game_days += 1.0 / 24.0  # 1 tap = 1 game hour
 	EventBus.game_days_changed.emit(game_days)
 
@@ -556,6 +603,23 @@ func buy_investor(index: int) -> void:
 	SaveManager.save()
 
 
+# --- Salary Boosts ---
+
+func can_afford_salary_boost(index: int) -> bool:
+	return resources >= SALARY_BOOSTS[index]["cost"] and not salary_boosts_purchased[index]
+
+
+func buy_salary_boost(index: int) -> void:
+	if not can_afford_salary_boost(index):
+		return
+	resources -= SALARY_BOOSTS[index]["cost"]
+	salary_boosts_purchased[index] = true
+	EventBus.salary_boost_purchased.emit(index)
+	EventBus.tap_value_changed.emit(tap_value)
+	EventBus.resource_changed.emit(resources)
+	SaveManager.save()
+
+
 # --- Helpers ---
 
 func get_strategy_multiplier() -> float:
@@ -572,6 +636,18 @@ func get_investor_multiplier() -> float:
 		if investors_purchased[i]:
 			mult *= INVESTORS[i]["multiplier"]
 	return mult
+
+
+func get_tap_multiplier() -> float:
+	var mult := 1.0
+	for i in range(SALARY_BOOSTS.size()):
+		if salary_boosts_purchased[i]:
+			mult *= SALARY_BOOSTS[i]["multiplier"]
+	return mult
+
+
+func get_effective_tap_value() -> float:
+	return tap_value * get_tap_multiplier()
 
 
 # -------------------------------------------------------
@@ -627,6 +703,10 @@ func _load_game() -> void:
 	var saved_investors: Array = data.get("investors_purchased", [])
 	for i in range(min(saved_investors.size(), investors_purchased.size())):
 		investors_purchased[i] = bool(saved_investors[i])
+
+	var saved_salary_boosts: Array = data.get("salary_boosts_purchased", [])
+	for i in range(min(saved_salary_boosts.size(), salary_boosts_purchased.size())):
+		salary_boosts_purchased[i] = bool(saved_salary_boosts[i])
 
 	# Rebuild tap value from purchased careers
 	tap_value = 1.0

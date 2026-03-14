@@ -20,19 +20,21 @@ extends Control
 @onready var _tada_sfx:        AudioStreamPlayer   = $TadaSound
 
 var _collapsed: Dictionary = {
-	"career":      true,
-	"investments": true,
-	"strategies":  true,
-	"ventures":    true,
-	"investors":   true,
+	"career":         true,
+	"investments":    true,
+	"strategies":     true,
+	"salary_boosts":  true,
+	"ventures":       true,
+	"investors":      true,
 }
 
 const _TITLES: Dictionary = {
-	"career":      "CAREER",
-	"investments": "INVESTMENTS",
-	"strategies":  "STRATEGIES",
-	"ventures":    "VENTURES",
-	"investors":   "INVESTORS",
+	"career":         "CAREER",
+	"investments":    "INVESTMENTS",
+	"strategies":     "STRATEGIES",
+	"salary_boosts":  "RAISES",
+	"ventures":       "VENTURES",
+	"investors":      "INVESTORS",
 }
 
 const _MONEY_GREEN    := Color(0.106, 0.369, 0.125, 1.0)
@@ -80,6 +82,7 @@ func _ready() -> void:
 	EventBus.strategy_purchased.connect(_on_strategy_purchased)
 	EventBus.venture_purchased.connect(_on_venture_purchased)
 	EventBus.investor_purchased.connect(_on_investor_purchased)
+	EventBus.salary_boost_purchased.connect(_on_salary_boost_purchased)
 	EventBus.offline_income_collected.connect(_on_offline_income)
 	EventBus.game_days_changed.connect(_on_game_days_changed)
 	EventBus.portfolio_changed.connect(_on_portfolio_changed)
@@ -140,7 +143,7 @@ func _input(event: InputEvent) -> void:
 	if $UpgradeDrawer.get_global_rect().has_point(pos):
 		return
 	GameManager.tap()
-	_spawn_tap_label(pos, GameManager.tap_value)
+	_spawn_tap_label(pos, GameManager.get_effective_tap_value())
 	if _coin_sfx.stream != null and Settings.sfx_enabled:
 		_coin_sfx.volume_db = Settings.sfx_volume_db()
 		_coin_sfx.play()
@@ -162,8 +165,8 @@ func _on_passive_rate_changed(rate: float) -> void:
 	_refresh_retirement()
 
 
-func _on_tap_value_changed(val: float) -> void:
-	salary_label.text = "Annual Salary: $%s" % _fmt(val * 2082.0)
+func _on_tap_value_changed(_val: float) -> void:
+	salary_label.text = "Annual Salary: $%s" % _fmt(GameManager.get_effective_tap_value() * 2082.0)
 
 
 func _on_career_purchased(index: int) -> void:
@@ -203,6 +206,20 @@ func _on_investor_purchased(index: int) -> void:
 		_tada_sfx.pitch_scale = randf_range(0.95, 1.05)
 		_tada_sfx.volume_db   = Settings.sfx_volume_db()
 		_tada_sfx.play()
+
+
+func _on_salary_boost_purchased(index: int) -> void:
+	_refresh_salary_boost_button(index)
+	_refresh_all_buttons()
+	_burst_at_upgrade("salary_boosts", "SalaryBoost_%d" % index)
+	if _tada_sfx.stream != null and Settings.sfx_enabled:
+		_tada_sfx.pitch_scale = randf_range(0.95, 1.05)
+		_tada_sfx.volume_db   = Settings.sfx_volume_db()
+		_tada_sfx.play()
+
+
+func _on_salary_boost_pressed(index: int) -> void:
+	GameManager.buy_salary_boost(index)
 
 
 func _on_offline_income(amount: float) -> void:
@@ -303,6 +320,14 @@ func _build_lists() -> void:
 		btn.pressed.connect(_on_strategy_pressed.bind(i))
 		_section_container("strategies").add_child(btn)
 		_refresh_strategy_button(i)
+
+	_add_section("salary_boosts")
+	for i in range(GameManager.SALARY_BOOSTS.size()):
+		var btn := _make_btn(52)
+		btn.name = "SalaryBoost_%d" % i
+		btn.pressed.connect(_on_salary_boost_pressed.bind(i))
+		_section_container("salary_boosts").add_child(btn)
+		_refresh_salary_boost_button(i)
 
 	_add_section("ventures")
 	for i in range(GameManager.VENTURES.size()):
@@ -544,6 +569,20 @@ func _refresh_venture_button(index: int) -> void:
 			not GameManager.can_afford_venture(index))
 
 
+func _refresh_salary_boost_button(index: int) -> void:
+	var container := upgrade_list.get_node_or_null("Section_salary_boosts") as VBoxContainer
+	if container == null: return
+	var btn := container.get_node_or_null("SalaryBoost_%d" % index) as Button
+	if btn == null: return
+	var s: Dictionary = GameManager.SALARY_BOOSTS[index]
+	if GameManager.salary_boosts_purchased[index]:
+		_set_btn(btn, "%s  [Active]" % s["name"], true)
+	else:
+		_set_btn(btn,
+			"%s — %s — Cost: $%s" % [s["name"], s["description"], _fmt(s["cost"])],
+			not GameManager.can_afford_salary_boost(index))
+
+
 func _refresh_investor_button(index: int) -> void:
 	var container := upgrade_list.get_node_or_null("Section_investors") as VBoxContainer
 	if container == null: return
@@ -577,6 +616,8 @@ func _refresh_all_buttons() -> void:
 		_refresh_investment_button(i)
 	for i in range(GameManager.STRATEGIES.size()):
 		_refresh_strategy_button(i)
+	for i in range(GameManager.SALARY_BOOSTS.size()):
+		_refresh_salary_boost_button(i)
 	for i in range(GameManager.VENTURES.size()):
 		_refresh_venture_button(i)
 	for i in range(GameManager.INVESTORS.size()):
@@ -585,7 +626,7 @@ func _refresh_all_buttons() -> void:
 
 func _refresh_ui() -> void:
 	resource_label.text = "$" + _fmt(GameManager.resources)
-	salary_label.text   = "Annual Salary: $%s" % _fmt(GameManager.tap_value * 2082.0)
+	salary_label.text   = "Annual Salary: $%s" % _fmt(GameManager.get_effective_tap_value() * 2082.0)
 	if GameManager.passive_rate > 0.0:
 		per_sec_label.text = "$%s / day" % _fmt(GameManager.passive_rate)
 	var portfolio_val: float = GameManager.total_invested + GameManager.total_dividends_earned
@@ -792,6 +833,10 @@ func _has_affordable(key: String) -> bool:
 			for i in range(GameManager.STRATEGIES.size()):
 				if GameManager.can_afford_strategy(i):
 					return true
+		"salary_boosts":
+			for i in range(GameManager.SALARY_BOOSTS.size()):
+				if GameManager.can_afford_salary_boost(i):
+					return true
 		"ventures":
 			for i in range(GameManager.VENTURES.size()):
 				if GameManager.can_afford_venture(i):
@@ -834,6 +879,14 @@ func _find_best_affordable_btn(key: String) -> Button:
 					best_cost = cost
 			if best_idx >= 0:
 				return container.get_node_or_null("Strategy_%d" % best_idx) as Button
+		"salary_boosts":
+			for i in range(GameManager.SALARY_BOOSTS.size()):
+				var cost: float = GameManager.SALARY_BOOSTS[i]["cost"]
+				if GameManager.can_afford_salary_boost(i) and cost > best_cost:
+					best_idx = i
+					best_cost = cost
+			if best_idx >= 0:
+				return container.get_node_or_null("SalaryBoost_%d" % best_idx) as Button
 		"ventures":
 			for i in range(GameManager.VENTURES.size()):
 				var cost: float = GameManager.VENTURES[i]["cost"]
