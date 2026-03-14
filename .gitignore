@@ -23,6 +23,7 @@ export_presets.cfg
 .DS_Store
 Thumbs.db
 desktop.ini
+._*
 
 # Editor backups
 *.bak
