@@ -17,6 +17,8 @@ extends Node2D
 @onready var upgrade_list:     VBoxContainer  = $HUD/UpgradeDrawer/ScrollContainer/UpgradeList
 @onready var upgrade_drawer:   PanelContainer = $HUD/UpgradeDrawer
 @onready var stage_label:      Label          = $HUD/StageLabel
+@onready var hamburger_btn:  Button = $HUD/HamburgerBtn
+@onready var drawer_overlay: Button = $HUD/DrawerOverlay
 @onready var player:           CharacterBody2D = $Player
 @onready var asteroid_field:   Node2D          = $World/AsteroidField
 
@@ -40,7 +42,8 @@ const _HEADER_LIT := Color(0.50, 1.00, 0.80, 1.0)
 const _DIM_BG    := Color(0.06, 0.06, 0.16, 0.95)
 
 var _loan_btn:          Button = null
-var _drawer_rect:       Rect2  = Rect2()
+var _drawer_open := false
+const _DRAWER_W  := 300.0
 
 
 func _ready() -> void:
@@ -57,9 +60,9 @@ func _ready() -> void:
 	_build_upgrade_list()
 	_spawn_asteroids()
 	_refresh_ui()
-
-	await get_tree().process_frame
-	_drawer_rect = upgrade_drawer.get_global_rect()
+	hamburger_btn.pressed.connect(_toggle_drawer)
+	drawer_overlay.pressed.connect(_toggle_drawer)
+	_style_hamburger_btn()
 
 
 func _process(_delta: float) -> void:
@@ -84,7 +87,7 @@ func _input(event: InputEvent) -> void:
 		return
 
 	# Let the upgrade drawer consume its own taps
-	if _drawer_rect.has_point(screen_pos):
+	if _drawer_open:
 		return
 
 	# Convert screen → world coordinates (Camera2D follows player)
@@ -188,9 +191,11 @@ func _apply_theme() -> void:
 	($HUD/TopHUD as PanelContainer).add_theme_stylebox_override("panel", top_style)
 
 	var drawer_style := StyleBoxFlat.new()
-	drawer_style.bg_color                 = Color(0.08, 0.08, 0.18, 0.97)
-	drawer_style.corner_radius_top_left   = 22
-	drawer_style.corner_radius_top_right  = 22
+	drawer_style.bg_color                        = Color(0.08, 0.08, 0.18, 0.97)
+	drawer_style.corner_radius_top_left          = 0
+	drawer_style.corner_radius_top_right         = 22
+	drawer_style.corner_radius_bottom_left       = 0
+	drawer_style.corner_radius_bottom_right      = 22
 	drawer_style.content_margin_left      = 8.0
 	drawer_style.content_margin_right     = 8.0
 	drawer_style.content_margin_top       = 8.0
@@ -288,9 +293,6 @@ func _toggle_section(key: String) -> void:
 		var hdr       := upgrade_list.get_node_or_null("Header_%s" % key) as Button
 		if container: container.visible = true
 		if hdr:       hdr.text = "── %s ▼" % _track_title(int(key.substr(6)))
-	# Recache drawer rect in case it resized
-	await get_tree().process_frame
-	_drawer_rect = upgrade_drawer.get_global_rect()
 
 
 func _on_track_pressed(track: int, index: int) -> void:
@@ -352,6 +354,7 @@ func _refresh_all_buttons() -> void:
 	for track in range(sizes.size()):
 		for i in range(sizes[track]):
 			_refresh_track_button(track, i)
+	_update_hamburger_notif()
 
 
 func _refresh_ui() -> void:
@@ -416,6 +419,67 @@ func _debug_reset() -> void:
 	GameManager.reset()
 	_build_upgrade_list()
 	_refresh_ui()
+
+
+func _toggle_drawer() -> void:
+	_drawer_open = not _drawer_open
+	drawer_overlay.visible = _drawer_open
+	hamburger_btn.text = "✕" if _drawer_open else "☰"
+	var tween := create_tween()
+	tween.set_parallel(true)
+	if _drawer_open:
+		tween.tween_property(upgrade_drawer, "offset_left",  0.0,        0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.tween_property(upgrade_drawer, "offset_right", _DRAWER_W,  0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	else:
+		tween.tween_property(upgrade_drawer, "offset_left",  -_DRAWER_W, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		tween.tween_property(upgrade_drawer, "offset_right", 0.0,        0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+
+
+func _style_hamburger_btn() -> void:
+	hamburger_btn.add_theme_font_size_override("font_size", 28)
+	hamburger_btn.add_theme_color_override("font_color", Color.WHITE)
+	var style := StyleBoxFlat.new()
+	style.bg_color            = Color(0.06, 0.06, 0.16, 0.88)
+	style.corner_radius_top_left     = 30
+	style.corner_radius_top_right    = 30
+	style.corner_radius_bottom_left  = 30
+	style.corner_radius_bottom_right = 30
+	style.shadow_color = Color(0, 0, 0, 0.3)
+	style.shadow_size  = 6
+	hamburger_btn.add_theme_stylebox_override("normal", style)
+	var style_h := style.duplicate() as StyleBoxFlat
+	style_h.bg_color = Color(0.12, 0.12, 0.28, 0.95)
+	hamburger_btn.add_theme_stylebox_override("hover",   style_h)
+	hamburger_btn.add_theme_stylebox_override("pressed", style_h)
+	var ov_style := StyleBoxFlat.new()
+	ov_style.bg_color = Color(0.0, 0.0, 0.0, 0.45)
+	drawer_overlay.add_theme_stylebox_override("normal",  ov_style)
+	drawer_overlay.add_theme_stylebox_override("hover",   ov_style)
+	drawer_overlay.add_theme_stylebox_override("pressed", ov_style)
+
+
+func _update_hamburger_notif() -> void:
+	if not is_instance_valid(hamburger_btn):
+		return
+	if _drawer_open:
+		return
+	var any_affordable := false
+	for key in _collapsed.keys():
+		if _has_affordable_track(key):
+			any_affordable = true
+			break
+	hamburger_btn.add_theme_color_override("font_color",
+		_GOLD if any_affordable else Color.WHITE)
+
+
+func _has_affordable_track(key: String) -> bool:
+	var track := int(key.substr(6))
+	var sizes := [GameConfig.TRACK_A.size(), GameConfig.TRACK_B.size(),
+		GameConfig.TRACK_C.size(), GameConfig.TRACK_D.size()]
+	for i in range(sizes[track]):
+		if GameManager.can_afford(track, i):
+			return true
+	return false
 
 
 # -------------------------------------------------------

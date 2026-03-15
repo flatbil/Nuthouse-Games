@@ -96,12 +96,25 @@ theme_override_font_sizes/font_size = 12
 text = "Retire in ~65yr  ·  est. $0.00"
 horizontal_alignment = 1
 
+[node name="DrawerOverlay" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+visible = false
+flat = true
+
 [node name="UpgradeDrawer" type="PanelContainer" parent="." unique_id=1446509856]
 layout_mode = 1
 anchors_preset = -1
-anchor_top = 0.54
-anchor_right = 1.0
+anchor_left = 0.0
+anchor_right = 0.0
+anchor_top = 0.0
 anchor_bottom = 1.0
+offset_left = -300.0
+offset_right = 0.0
 
 [node name="ScrollContainer" type="ScrollContainer" parent="UpgradeDrawer" unique_id=1159701968]
 layout_mode = 2
@@ -121,3 +134,15 @@ volume_db = -3.0
 
 [node name="TadaSound" type="AudioStreamPlayer" parent="." unique_id=1279620241]
 stream = ExtResource("3_78awf")
+
+[node name="HamburgerBtn" type="Button" parent="."]
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = -68.0
+offset_right = -8.0
+offset_top = -68.0
+offset_bottom = -8.0
+text = "☰"

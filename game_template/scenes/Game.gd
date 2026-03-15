@@ -20,6 +20,9 @@ extends Control
 @onready var retirement_label: Label         = $TopHUD/Stats/RetirementLabel
 @onready var upgrade_list:     VBoxContainer = $UpgradeDrawer/ScrollContainer/UpgradeList
 @onready var stage_label:      Label         = $StageLabel
+@onready var hamburger_btn:  Button        = $HamburgerBtn
+@onready var drawer_overlay: Button        = $DrawerOverlay
+@onready var upgrade_drawer: PanelContainer = $UpgradeDrawer
 
 # Section collapse state — keys are "track_0" … "track_3"
 var _collapsed: Dictionary = {
@@ -40,6 +43,9 @@ var _idle_showing: bool  = false
 var _idle_tween:   Tween = null
 var _idle_label:   Label = null
 
+var _drawer_open := false
+const _DRAWER_W  := 300.0
+
 var _loan_btn: Button = null
 
 
@@ -54,6 +60,9 @@ func _ready() -> void:
 	AdManager.loan_rewarded.connect(_on_loan_rewarded)
 
 	_apply_theme()
+	hamburger_btn.pressed.connect(_toggle_drawer)
+	drawer_overlay.pressed.connect(_toggle_drawer)
+	_style_hamburger_btn()
 	_build_lists()
 	_refresh_ui()
 	await get_tree().process_frame
@@ -92,7 +101,7 @@ func _input(event: InputEvent) -> void:
 		pos = event.position
 	else:
 		return
-	if $UpgradeDrawer.get_global_rect().has_point(pos):
+	if _drawer_open:
 		return
 	GameManager.tap()
 	_spawn_tap_label(pos, GameManager.get_effective_tap_value())
@@ -390,10 +399,7 @@ func _on_loan_pressed() -> void:
 
 
 func _on_loan_rewarded(_amount: float) -> void:
-	_spawn_upgrade_burst(
-		($UpgradeDrawer as Control).global_position
-		+ Vector2(($UpgradeDrawer as Control).size.x * 0.5, 40.0)
-	)
+	_spawn_upgrade_burst(hamburger_btn.global_position + hamburger_btn.size / 2.0)
 
 
 # -------------------------------------------------------
@@ -497,7 +503,7 @@ func _create_idle_hint() -> void:
 	_idle_label.anchor_bottom = 0.0
 	add_child(_idle_label)
 	var zone_top:    float = ($TopHUD as Control).global_position.y + ($TopHUD as Control).size.y
-	var zone_bottom: float = ($UpgradeDrawer as Control).global_position.y
+	var zone_bottom: float = get_viewport().get_visible_rect().size.y
 	var mid:         float = (zone_top + zone_bottom) * 0.5
 	_idle_label.offset_top    = mid - 20.0
 	_idle_label.offset_bottom = mid + 20.0
@@ -593,6 +599,7 @@ func _update_section_indicators() -> void:
 				lbl.position = btn.global_position + Vector2(6.0, btn.size.y * 0.5 - 10.0)
 			else:
 				lbl.visible = false
+	_update_hamburger_notif()
 
 
 func _has_affordable(key: String) -> bool:
@@ -658,6 +665,58 @@ func _stop_bob(key: String) -> void:
 		_bob_tweens.erase(key)
 
 
+func _toggle_drawer() -> void:
+	_drawer_open = not _drawer_open
+	drawer_overlay.visible = _drawer_open
+	hamburger_btn.text = "✕" if _drawer_open else "☰"
+	var tween := create_tween()
+	tween.set_parallel(true)
+	if _drawer_open:
+		tween.tween_property(upgrade_drawer, "offset_left",  0.0,        0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.tween_property(upgrade_drawer, "offset_right", _DRAWER_W,  0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	else:
+		tween.tween_property(upgrade_drawer, "offset_left",  -_DRAWER_W, 0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		tween.tween_property(upgrade_drawer, "offset_right", 0.0,        0.22).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+
+
+func _style_hamburger_btn() -> void:
+	hamburger_btn.add_theme_font_size_override("font_size", 28)
+	hamburger_btn.add_theme_color_override("font_color", Color.WHITE)
+	var style := StyleBoxFlat.new()
+	style.bg_color            = Color(0.10, 0.10, 0.20, 0.88)
+	style.corner_radius_top_left     = 30
+	style.corner_radius_top_right    = 30
+	style.corner_radius_bottom_left  = 30
+	style.corner_radius_bottom_right = 30
+	style.shadow_color = Color(0, 0, 0, 0.3)
+	style.shadow_size  = 6
+	hamburger_btn.add_theme_stylebox_override("normal", style)
+	var style_h := style.duplicate() as StyleBoxFlat
+	style_h.bg_color = Color(0.18, 0.18, 0.32, 0.95)
+	hamburger_btn.add_theme_stylebox_override("hover",   style_h)
+	hamburger_btn.add_theme_stylebox_override("pressed", style_h)
+	# Overlay semi-transparent style
+	var ov_style := StyleBoxFlat.new()
+	ov_style.bg_color = Color(0.0, 0.0, 0.0, 0.45)
+	drawer_overlay.add_theme_stylebox_override("normal",  ov_style)
+	drawer_overlay.add_theme_stylebox_override("hover",   ov_style)
+	drawer_overlay.add_theme_stylebox_override("pressed", ov_style)
+
+
+func _update_hamburger_notif() -> void:
+	if not is_instance_valid(hamburger_btn):
+		return
+	if _drawer_open:
+		return
+	var any_affordable := false
+	for key in _collapsed.keys():
+		if _has_affordable(key):
+			any_affordable = true
+			break
+	hamburger_btn.add_theme_color_override("font_color",
+		GameConfig.COLOR_GOLD if any_affordable else Color.WHITE)
+
+
 # -------------------------------------------------------
 # Theme / styling
 # -------------------------------------------------------
@@ -678,9 +737,11 @@ func _apply_theme() -> void:
 	$TopHUD.add_theme_stylebox_override("panel", hud)
 
 	var drawer := StyleBoxFlat.new()
-	drawer.bg_color                 = Color(1.0, 1.0, 1.0, 0.97)
-	drawer.corner_radius_top_left   = 22
-	drawer.corner_radius_top_right  = 22
+	drawer.bg_color                       = Color(1.0, 1.0, 1.0, 0.97)
+	drawer.corner_radius_top_left         = 0
+	drawer.corner_radius_top_right        = 22
+	drawer.corner_radius_bottom_left      = 0
+	drawer.corner_radius_bottom_right     = 22
 	drawer.content_margin_left      = 8.0
 	drawer.content_margin_right     = 8.0
 	drawer.content_margin_top       = 8.0
