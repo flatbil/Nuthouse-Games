@@ -1,0 +1,77 @@
+[gd_scene load_steps=3 format=3 uid="uid://c1am0004gamex"]
+
+[ext_resource type="Script" path="res://scenes/Game.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://c1am0002playr" path="res://scenes/Player.tscn" id="2_player"]
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="AsteroidField" type="Node2D" parent="World"]
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(195, 422)
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="TopHUD" type="PanelContainer" parent="HUD"]
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_bottom = 96.0
+
+[node name="Stats" type="VBoxContainer" parent="HUD/TopHUD"]
+layout_mode = 2
+add_theme_constant_override("separation") = 2
+
+[node name="ResourceLabel" type="Label" parent="HUD/TopHUD/Stats"]
+layout_mode = 2
+text = "$0"
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(0.3, 0.8, 1.0, 1.0)
+
+[node name="RateLabel" type="Label" parent="HUD/TopHUD/Stats"]
+layout_mode = 2
+text = "Mining Rate: —"
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.7, 0.9, 1.0, 1.0)
+
+[node name="PerSecLabel" type="Label" parent="HUD/TopHUD/Stats"]
+layout_mode = 2
+text = ""
+theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.6, 1.0, 0.7, 1.0)
+
+[node name="DaysLabel" type="Label" parent="HUD/TopHUD/Stats"]
+layout_mode = 2
+text = "Day 1  ·  Year 1"
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.6, 0.6, 0.8, 1.0)
+
+[node name="StageLabel" type="Label" parent="HUD"]
+anchor_left = 0.0
+anchor_right = 1.0
+anchor_top = 0.35
+anchor_bottom = 0.65
+text = "Space Rookie"
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(0.3, 0.8, 1.0, 0.15)
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2
+
+[node name="UpgradeDrawer" type="PanelContainer" parent="HUD"]
+anchor_left = 0.0
+anchor_right = 1.0
+anchor_top = 0.54
+anchor_bottom = 1.0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="HUD/UpgradeDrawer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="UpgradeList" type="VBoxContainer" parent="HUD/UpgradeDrawer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+add_theme_constant_override("separation") = 4
