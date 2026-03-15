@@ -92,6 +92,20 @@ func _input(event: InputEvent) -> void:
 
 	# Convert screen → world coordinates (Camera2D follows player)
 	var world_pos: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * screen_pos
+
+	# Snap to nearest non-depleted asteroid when tapping within range
+	const SNAP_RADIUS := 60.0
+	var nearest: Node2D  = null
+	var nearest_dist     := SNAP_RADIUS
+	for body in get_tree().get_nodes_in_group("asteroids"):
+		if body is Node2D and not (body as Node).get("_is_depleted"):
+			var d: float = (body as Node2D).global_position.distance_to(world_pos)
+			if d < nearest_dist:
+				nearest_dist = d
+				nearest      = body as Node2D
+	if nearest != null:
+		world_pos = nearest.global_position
+
 	player.set_move_target(world_pos)
 
 

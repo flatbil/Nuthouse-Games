@@ -50,11 +50,27 @@ func set_move_target(world_pos: Vector2) -> void:
 # -------------------------------------------------------
 
 func _update_movement() -> void:
+	# WASD / arrow keys — direct control on desktop
+	var dir := Vector2.ZERO
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    dir.y -= 1.0
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  dir.y += 1.0
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  dir.x -= 1.0
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): dir.x += 1.0
+
+	if dir != Vector2.ZERO:
+		velocity    = dir.normalized() * SPEED
+		move_target = global_position   # cancel any tap target
+		_is_moving  = true
+		if sprite and sprite.sprite_frames:
+			sprite.flip_h = velocity.x < 0.0
+		move_and_slide()
+		return
+
+	# Tap-to-move
 	var to_target := move_target - global_position
 	if to_target.length() > 6.0:
 		velocity    = to_target.normalized() * SPEED
 		_is_moving  = true
-		# Flip sprite to face movement direction
 		if sprite and sprite.sprite_frames:
 			sprite.flip_h = velocity.x < 0.0
 	else:

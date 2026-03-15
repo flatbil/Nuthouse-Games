@@ -28,6 +28,7 @@ var _is_depleted: bool  = false
 
 
 func _ready() -> void:
+	add_to_group("asteroids")
 	health = max_health
 	_play_if_exists("idle")
 

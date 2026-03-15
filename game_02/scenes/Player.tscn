@@ -1,28 +1,86 @@
-[gd_scene load_steps=4 format=3 uid="uid://c1am0002playr"]
+[gd_scene format=3 uid="uid://c1am0002playr"]
 
-[ext_resource type="Script" path="res://scenes/Player.gd" id="1_script"]
+[ext_resource type="Script" uid="uid://cja5655j601o2" path="res://scenes/Player.gd" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://c20l33jpbigrf" path="res://assets/sprites/character/tilemap-characters.png" id="2_v6fml"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3li8b"]
+atlas = ExtResource("2_v6fml")
+region = Rect2(0, 50, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_mdl7e"]
+atlas = ExtResource("2_v6fml")
+region = Rect2(100, 50, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_qu4a1"]
+atlas = ExtResource("2_v6fml")
+region = Rect2(125, 50, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_70d11"]
+atlas = ExtResource("2_v6fml")
+region = Rect2(25, 50, 24, 24)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_cw2d6"]
+atlas = ExtResource("2_v6fml")
+region = Rect2(50, 50, 24, 24)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_khinc"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_3li8b")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 4.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_mdl7e")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_qu4a1")
+}],
+"loop": true,
+"name": &"mine",
+"speed": 6.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_70d11")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_cw2d6")
+}],
+"loop": true,
+"name": &"walk",
+"speed": 8.0
+}]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_body"]
 radius = 8.0
 height = 16.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_mine"]
-radius = 72.0
+radius = 20.0
 
-[node name="Player" type="CharacterBody2D"]
+[node name="Player" type="CharacterBody2D" unique_id=421587396]
 script = ExtResource("1_script")
 
-[node name="Sprite" type="AnimatedSprite2D" parent="."]
+[node name="Sprite" type="AnimatedSprite2D" parent="." unique_id=887742242]
 position = Vector2(0, -4)
+sprite_frames = SubResource("SpriteFrames_khinc")
+animation = &"mine"
 
-[node name="BodyShape" type="CollisionShape2D" parent="."]
+[node name="BodyShape" type="CollisionShape2D" parent="." unique_id=1024962315]
 shape = SubResource("CapsuleShape2D_body")
 
-[node name="MineArea" type="Area2D" parent="."]
+[node name="MineArea" type="Area2D" parent="." unique_id=1636318372]
+collision_layer = 0
+collision_mask = 2
 
-[node name="MineShape" type="CollisionShape2D" parent="MineArea"]
+[node name="MineShape" type="CollisionShape2D" parent="MineArea" unique_id=2113012005]
 shape = SubResource("CircleShape2D_mine")
 
-[node name="Camera" type="Camera2D" parent="."]
+[node name="Camera" type="Camera2D" parent="." unique_id=1912852843]
 position_smoothing_enabled = true
 position_smoothing_speed = 8.0
