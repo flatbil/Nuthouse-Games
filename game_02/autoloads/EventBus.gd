@@ -20,3 +20,4 @@ signal game_ended()
 # Asteroid Miner specific
 signal asteroid_depleted(position: Vector2)
 signal zone_changed(zone_index: int)
+signal credits_mined(world_pos: Vector2, amount: float)

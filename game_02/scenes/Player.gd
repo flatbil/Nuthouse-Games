@@ -95,6 +95,7 @@ func _update_mining(delta: float) -> void:
 		if _mine_timer >= MINE_INTERVAL:
 			_mine_timer = 0.0
 			GameManager.tap()
+			EventBus.credits_mined.emit(global_position, GameManager.get_effective_tap_value())
 			if current_asteroid.has_method("take_damage"):
 				current_asteroid.take_damage(1.0)
 

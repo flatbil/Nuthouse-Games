@@ -54,6 +54,7 @@ func _ready() -> void:
 	EventBus.game_days_changed.connect(_on_game_days_changed)
 	EventBus.offline_income_collected.connect(_on_offline_income)
 	EventBus.game_ended.connect(_on_game_ended)
+	EventBus.credits_mined.connect(_on_credits_mined)
 	AdManager.loan_rewarded.connect(_on_loan_rewarded)
 
 	_apply_theme()
@@ -153,6 +154,23 @@ func _on_game_ended() -> void:
 
 func _on_loan_rewarded(_amount: float) -> void:
 	pass
+
+
+func _on_credits_mined(world_pos: Vector2, amount: float) -> void:
+	var screen_pos := get_viewport().get_canvas_transform() * world_pos
+	var lbl := Label.new()
+	lbl.text = "+%s" % _cur(amount)
+	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_color_override("font_color", _CYAN)
+	lbl.position     = screen_pos - Vector2(30.0, 16.0)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$HUD.add_child(lbl)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(lbl, "position:y", screen_pos.y - 80.0, 0.75).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(lbl, "modulate:a", 0.0, 0.5).set_delay(0.25)
+	await tween.finished
+	lbl.queue_free()
 
 
 # -------------------------------------------------------
