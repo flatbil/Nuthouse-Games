@@ -94,12 +94,10 @@ func _update_orbit_rotation(delta: float) -> void:
 	if dir != 0.0:
 		GameManager.orbit_rotation += dir * ORBIT_ROTATE_SPEED * delta
 
-	# Rotate the asteroid field and orbit lines together
-	asteroid_field.rotation     = GameManager.orbit_rotation
-	if is_instance_valid(_orbit_lines_node):
-		_orbit_lines_node.rotation = GameManager.orbit_rotation
+	# Orbit field and lines stay fixed — rotation is applied per-asteroid via orbit_rotation offset
+	asteroid_field.rotation = 0.0
 
-	# Planet matches the orbit rotation exactly (stays in sync)
+	# Planet rotates in sync with orbit_rotation (matches asteroid drift direction)
 	if is_instance_valid(_planet_node):
 		_planet_node.rotation = GameManager.orbit_rotation
 

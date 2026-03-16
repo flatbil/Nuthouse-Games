@@ -38,7 +38,8 @@ func _ready() -> void:
 	add_to_group("asteroids")
 	_apply_tier(tier)
 	if orbit_rx > 0.0:
-		position = Vector2(cos(orbit_angle) * orbit_rx, sin(orbit_angle) * orbit_ry)
+		var da: float = orbit_angle + GameManager.orbit_rotation
+		position = Vector2(cos(da) * orbit_rx, sin(da) * orbit_ry)
 		_update_depth()
 	_play_if_exists("idle")
 	if is_instance_valid(sprite):
@@ -49,7 +50,8 @@ func _process(delta: float) -> void:
 	orbit_angle = fmod(orbit_angle + ORBIT_SPEED * delta, TAU)
 	if orbit_rx <= 0.0 or _is_depleted:
 		return
-	position = Vector2(cos(orbit_angle) * orbit_rx, sin(orbit_angle) * orbit_ry)
+	var display_angle: float = orbit_angle + GameManager.orbit_rotation
+	position = Vector2(cos(display_angle) * orbit_rx, sin(display_angle) * orbit_ry)
 	_update_depth()
 
 
@@ -129,7 +131,8 @@ func _respawn() -> void:
 	visible      = true
 	shape.disabled = false
 	if orbit_rx > 0.0:
-		position = Vector2(cos(orbit_angle) * orbit_rx, sin(orbit_angle) * orbit_ry)
+		var da: float = orbit_angle + GameManager.orbit_rotation
+		position = Vector2(cos(da) * orbit_rx, sin(da) * orbit_ry)
 	_update_depth()
 	_play_if_exists("idle")
 
