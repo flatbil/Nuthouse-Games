@@ -57,11 +57,11 @@ const TRACK_D_TITLE := "PILOT SKILLS"
 # color:        modulate tint so tiers look distinct
 
 const ASTEROID_TIERS: Array = [
-	{"tier": 1, "hits":   3, "reward_scale":  1.0, "sprite_scale": 1.0, "color": Color(1.00, 1.00, 1.00)},
-	{"tier": 2, "hits":   8, "reward_scale":  3.0, "sprite_scale": 1.6, "color": Color(0.60, 0.85, 1.00)},
-	{"tier": 3, "hits":  20, "reward_scale":  8.0, "sprite_scale": 2.4, "color": Color(0.50, 1.00, 0.60)},
-	{"tier": 4, "hits":  50, "reward_scale": 20.0, "sprite_scale": 3.2, "color": Color(1.00, 0.85, 0.30)},
-	{"tier": 5, "hits": 100, "reward_scale": 50.0, "sprite_scale": 4.0, "color": Color(1.00, 0.50, 0.50)},
+	{"tier": 1, "hits":   3, "reward_scale":  1.0, "sprite_scale": 0.9, "color": Color(1.00, 1.00, 1.00)},
+	{"tier": 2, "hits":   8, "reward_scale":  3.0, "sprite_scale": 1.3, "color": Color(0.60, 0.85, 1.00)},
+	{"tier": 3, "hits":  20, "reward_scale":  8.0, "sprite_scale": 1.8, "color": Color(0.50, 1.00, 0.60)},
+	{"tier": 4, "hits":  50, "reward_scale": 20.0, "sprite_scale": 2.3, "color": Color(1.00, 0.85, 0.30)},
+	{"tier": 5, "hits": 100, "reward_scale": 50.0, "sprite_scale": 3.0, "color": Color(1.00, 0.50, 0.50)},
 ]
 
 

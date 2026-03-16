@@ -271,12 +271,11 @@ func _spawn_asteroids() -> void:
 	var t: int           = zone_idx + 1
 	for i in range(ASTEROID_COUNT):
 		var asteroid := ASTEROID_SCENE.instantiate()
-		asteroid.tier = t
-		var angle := (TAU / float(ASTEROID_COUNT)) * float(i) + randf() * 0.4
-		var rx    := randf_range(float(zone["radius_min"]), float(zone["radius_max"]))
-		var ry    := rx * ORBIT_RY_RATIO   # side-view: compress y-axis
-		asteroid.position = Vector2(cos(angle) * rx, sin(angle) * ry)
-		asteroid_field.add_child(asteroid)
+		asteroid.tier         = t
+		asteroid.orbit_angle  = (TAU / float(ASTEROID_COUNT)) * float(i) + randf() * 0.4
+		asteroid.orbit_rx     = randf_range(float(zone["radius_min"]), float(zone["radius_max"]))
+		asteroid.orbit_ry     = asteroid.orbit_rx * ORBIT_RY_RATIO
+		asteroid_field.add_child(asteroid)  # _ready() reads orbit params
 	_refresh_orbit_lines()
 
 

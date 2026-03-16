@@ -1,28 +1,34 @@
 extends StaticBody2D
 
 # -------------------------------------------------------
-# Asteroid — a mineable resource node.
+# Asteroid — orbits the world origin, mimicking a 3D side-
+# view via depth scaling:
 #
-# Tiers (1–5) are set by the spawner via the `tier` export
-# before add_child(), so _ready() can configure visuals,
-# collision scale, and HP automatically.
+#   sin(orbit_angle) = +1  → front of orbit
+#     → full tier scale, fully opaque, drawn in front
+#   sin(orbit_angle) = -1  → back of orbit (behind planet)
+#     → 12% scale, ~18% opacity  → appears tiny/distant
 #
-# Sprite setup (assign in editor after importing sprites):
-#   $Sprite → AnimatedSprite2D
-#   Animations: "idle" (loop), "hit" (no loop), "break" (no loop)
-#
-# Collision setup:
-#   $Shape → CollisionShape2D with CircleShape2D
-#   Base radius ~20px for T1; scales up with sprite_scale.
+# Set  tier, orbit_angle, orbit_rx, orbit_ry  BEFORE
+# add_child() so _ready() initialises correctly.
 # -------------------------------------------------------
 
+# ── Set by spawner before add_child() ──────────────────
 @export var tier:          int   = 1
+@export var orbit_angle:   float = 0.0
+@export var orbit_rx:      float = 0.0
+@export var orbit_ry:      float = 0.0
 @export var respawn_delay: float = 8.0
 
-var _max_hits:    int   = 0
-var _hits_taken:  int   = 0
-var _is_depleted: bool  = false
+# Orbital motion speed — one full revolution per 60 s.
+const ORBIT_SPEED := TAU / 60.0
+
+# ── Runtime state ───────────────────────────────────────
+var _max_hits:     int   = 0
+var _hits_taken:   int   = 0
+var _is_depleted:  bool  = false
 var _reward_scale: float = 1.0
+var _base_scale:   float = 1.0
 
 @onready var sprite: AnimatedSprite2D = $Sprite
 @onready var shape:  CollisionShape2D = $Shape
@@ -31,29 +37,28 @@ var _reward_scale: float = 1.0
 func _ready() -> void:
 	add_to_group("asteroids")
 	_apply_tier(tier)
+	if orbit_rx > 0.0:
+		position = Vector2(cos(orbit_angle) * orbit_rx, sin(orbit_angle) * orbit_ry)
+		_update_depth()
 	_play_if_exists("idle")
 	if is_instance_valid(sprite):
 		sprite.animation_finished.connect(_on_animation_finished)
 
 
-# Called by the spawner or directly before add_child to configure the tier.
-func _apply_tier(t: int) -> void:
-	tier = clamp(t, 1, GameConfig.ASTEROID_TIERS.size())
-	var data: Dictionary = GameConfig.ASTEROID_TIERS[tier - 1]
-	_max_hits     = int(data["hits"])
-	_reward_scale = float(data["reward_scale"])
-	var s: float  = float(data["sprite_scale"])
-	scale         = Vector2(s, s)
-	modulate      = data["color"]
-	_hits_taken   = 0
+func _process(delta: float) -> void:
+	orbit_angle = fmod(orbit_angle + ORBIT_SPEED * delta, TAU)
+	if orbit_rx <= 0.0 or _is_depleted:
+		return
+	position = Vector2(cos(orbit_angle) * orbit_rx, sin(orbit_angle) * orbit_ry)
+	_update_depth()
 
 
-# Returns true if this asteroid's tier is within the ship's mining capability.
+# ── Public API ─────────────────────────────────────────
+
 func can_be_mined_by(ship_tier: int) -> bool:
 	return ship_tier >= tier
 
 
-# Called by Player each mine swing.
 func take_damage(_amount: float) -> void:
 	if _is_depleted:
 		return
@@ -63,33 +68,50 @@ func take_damage(_amount: float) -> void:
 		_deplete()
 
 
-# Called when player tries to mine but ship tier is too low.
+# Flash sprite red — tweens sprite.modulate so it doesn't
+# fight the depth effect on self.modulate.
 func show_blocked() -> void:
+	if not is_instance_valid(sprite):
+		return
 	var tween := create_tween()
-	tween.tween_property(self, "modulate", Color.RED, 0.08)
-	tween.tween_property(self, "modulate", GameConfig.ASTEROID_TIERS[tier - 1]["color"], 0.25)
+	tween.tween_property(sprite, "modulate", Color.RED,   0.08)
+	tween.tween_property(sprite, "modulate", Color.WHITE, 0.25)
 
 
-# -------------------------------------------------------
-# Private
-# -------------------------------------------------------
+# ── Private ────────────────────────────────────────────
+
+func _apply_tier(t: int) -> void:
+	tier          = clamp(t, 1, GameConfig.ASTEROID_TIERS.size())
+	var data      := GameConfig.ASTEROID_TIERS[tier - 1] as Dictionary
+	_max_hits     = int(data["hits"])
+	_reward_scale = float(data["reward_scale"])
+	_base_scale   = float(data["sprite_scale"])
+	_hits_taken   = 0
+
+
+func _update_depth() -> void:
+	# depth 0 = back of orbit, 1 = front
+	var depth := (sin(orbit_angle) + 1.0) * 0.5
+	var s     := _base_scale * lerp(0.12, 1.0, depth)
+	scale = Vector2(s, s)
+	var tc: Color = GameConfig.ASTEROID_TIERS[tier - 1]["color"]
+	# Tier colour tint preserved; alpha fades with depth
+	modulate = Color(tc.r, tc.g, tc.b, lerp(0.18, 1.0, depth))
+	# Draw behind player / orbit lines when in back half
+	z_index = -2 if depth < 0.45 else 0
+
 
 func _deplete() -> void:
 	_is_depleted = true
 	shape.set_deferred("disabled", true)
-
-	# Award credits — burst reward based on tier and current ship/zone strength.
-	var reward: float = GameManager.get_effective_tap_value() * _reward_scale
+	var reward := GameManager.get_effective_tap_value() * _reward_scale
 	GameManager.add_resources(reward)
 	EventBus.credits_mined.emit(global_position, reward)
 	EventBus.asteroid_depleted.emit(global_position)
-
 	_play_if_exists("break")
-
 	if is_instance_valid(sprite) and sprite.sprite_frames \
 			and sprite.sprite_frames.has_animation("break"):
 		await sprite.animation_finished
-
 	visible = false
 	await get_tree().create_timer(respawn_delay).timeout
 	_respawn()
@@ -100,6 +122,9 @@ func _respawn() -> void:
 	_hits_taken  = 0
 	visible      = true
 	shape.disabled = false
+	if orbit_rx > 0.0:
+		position = Vector2(cos(orbit_angle) * orbit_rx, sin(orbit_angle) * orbit_ry)
+	_update_depth()
 	_play_if_exists("idle")
 
 
