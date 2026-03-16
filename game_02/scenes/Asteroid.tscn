@@ -50,7 +50,7 @@ animations = [{
 "duration": 1.0,
 "texture": ExtResource("11_va2x1")
 }],
-"loop": true,
+"loop": false,
 "name": &"hit",
 "speed": 12.0
 }, {

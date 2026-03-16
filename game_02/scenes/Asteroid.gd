@@ -31,6 +31,8 @@ func _ready() -> void:
 	add_to_group("asteroids")
 	health = max_health
 	_play_if_exists("idle")
+	if is_instance_valid(sprite):
+		sprite.animation_finished.connect(_on_animation_finished)
 
 
 # Called by Player each mine swing.
@@ -69,6 +71,11 @@ func _respawn() -> void:
 	visible      = true
 	shape.disabled = false
 	_play_if_exists("idle")
+
+
+func _on_animation_finished() -> void:
+	if sprite.animation == &"hit" and not _is_depleted:
+		_play_if_exists("idle")
 
 
 func _play_if_exists(anim: String) -> void:
