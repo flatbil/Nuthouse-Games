@@ -89,13 +89,16 @@ func _update_mining(delta: float) -> void:
 		_mine_timer = 0.0
 		return
 
+	# Block mining if ship tier is too low for this asteroid
+	if current_asteroid.has_method("can_be_mined_by") \
+			and not current_asteroid.can_be_mined_by(GameManager.ship_tier):
+		return
+
 	# Stop moving while mining — feel attached to the rock
 	if not _is_moving:
 		_mine_timer += delta
 		if _mine_timer >= MINE_INTERVAL:
 			_mine_timer = 0.0
-			GameManager.tap()
-			EventBus.credits_mined.emit(global_position, GameManager.get_effective_tap_value())
 			if current_asteroid.has_method("take_damage"):
 				current_asteroid.take_damage(1.0)
 
@@ -128,6 +131,11 @@ func _on_mine_area_body_entered(body: Node) -> void:
 	# Only latch on to one asteroid at a time
 	if body != self and current_asteroid == null and body is StaticBody2D:
 		current_asteroid = body as StaticBody2D
+		# Immediately signal and show visual if this asteroid is too tough
+		if current_asteroid.has_method("can_be_mined_by") \
+				and not current_asteroid.can_be_mined_by(GameManager.ship_tier):
+			current_asteroid.show_blocked()
+			EventBus.mine_blocked.emit(global_position)
 
 
 func _on_mine_area_body_exited(body: Node) -> void:

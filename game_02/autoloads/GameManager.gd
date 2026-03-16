@@ -25,6 +25,7 @@ var track_c_purchased: Array = []   # bool — one-time passive multipliers
 var track_d_purchased: Array = []   # bool — one-time mine multipliers
 
 var current_zone: int = 0
+var ship_tier:    int = 1   # increases when spacecraft with higher ship_tier are purchased
 
 
 func _ready() -> void:
@@ -51,6 +52,7 @@ func reset() -> void:
 	track_c_purchased.fill(false)
 	track_d_purchased.fill(false)
 	current_zone = 0
+	ship_tier    = 1
 	EventBus.resource_changed.emit(resources)
 	EventBus.tap_value_changed.emit(tap_value)
 	EventBus.passive_rate_changed.emit(passive_rate)
@@ -121,6 +123,9 @@ func buy_item(track: int, index: int) -> void:
 		0:
 			track_a_purchased[index] = true
 			tap_value += float(GameConfig.TRACK_A[index]["tap_bonus"])
+			var new_tier: int = int(GameConfig.TRACK_A[index].get("ship_tier", 1))
+			if new_tier > ship_tier:
+				ship_tier = new_tier
 			var unlocks: int = int(GameConfig.TRACK_A[index].get("unlocks_zone", -1))
 			if unlocks >= 0 and unlocks > current_zone:
 				current_zone = unlocks
@@ -217,11 +222,15 @@ func _load_game() -> void:
 
 	current_zone = int(data.get("current_zone", 0))
 
-	# Rebuild tap_value from purchased drills
+	# Rebuild tap_value and ship_tier from purchased spacecraft
 	tap_value = 1.0
+	ship_tier = 1
 	for i in range(GameConfig.TRACK_A.size()):
 		if track_a_purchased[i]:
 			tap_value += float(GameConfig.TRACK_A[i]["tap_bonus"])
+			var t: int = int(GameConfig.TRACK_A[i].get("ship_tier", 1))
+			if t > ship_tier:
+				ship_tier = t
 
 	_recalculate_passive_rate()
 

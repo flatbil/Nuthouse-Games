@@ -49,6 +49,22 @@ const TRACK_C_TITLE := "SHIP SYSTEMS"
 const TRACK_D_TITLE := "PILOT SKILLS"
 
 
+# ── Asteroid Tiers ─────────────────────────────────────────────
+# Matched 1-to-1 with zones (T1 = zone 0, T5 = zone 4).
+# hits:         mine swings needed to break
+# reward_scale: multiplier on get_effective_tap_value() when asteroid breaks
+# sprite_scale: scales the whole asteroid node (visual + collision)
+# color:        modulate tint so tiers look distinct
+
+const ASTEROID_TIERS: Array = [
+	{"tier": 1, "hits":   3, "reward_scale":  1.0, "sprite_scale": 1.0, "color": Color(1.00, 1.00, 1.00)},
+	{"tier": 2, "hits":   8, "reward_scale":  3.0, "sprite_scale": 1.6, "color": Color(0.60, 0.85, 1.00)},
+	{"tier": 3, "hits":  20, "reward_scale":  8.0, "sprite_scale": 2.4, "color": Color(0.50, 1.00, 0.60)},
+	{"tier": 4, "hits":  50, "reward_scale": 20.0, "sprite_scale": 3.2, "color": Color(1.00, 0.85, 0.30)},
+	{"tier": 5, "hits": 100, "reward_scale": 50.0, "sprite_scale": 4.0, "color": Color(1.00, 0.50, 0.50)},
+]
+
+
 # ── Orbital Zones ──────────────────────────────────────────────
 # Each zone is a ring of asteroids at a greater orbital radius.
 # ore_multiplier scales ALL income (active + passive) when in that zone.
@@ -92,6 +108,7 @@ const TRACK_A: Array = [
 		"description":  "Better tools for your suit. Mine +10 credits.",
 		"cost":         350.0,
 		"tap_bonus":    10.0,
+		"ship_tier":    1,
 		"unlocks_zone": -1,
 	},
 	{
@@ -99,34 +116,39 @@ const TRACK_A: Array = [
 		"description":  "Boost mobility in zero-g. Mine +35 credits.",
 		"cost":         4_000.0,
 		"tap_bonus":    35.0,
+		"ship_tier":    1,
 		"unlocks_zone": -1,
 	},
 	{
 		"name":         "Scout Rocket",
-		"description":  "Your first real ship. Reach the Inner Belt! Mine +120 credits.",
+		"description":  "Your first real ship. Reach the Inner Belt!",
 		"cost":         50_000.0,
 		"tap_bonus":    120.0,
+		"ship_tier":    2,
 		"unlocks_zone": 1,
 	},
 	{
 		"name":         "Mining Vessel",
-		"description":  "Pressurised hull, drill array. Reach the Main Belt! Mine +500 credits.",
+		"description":  "Pressurised hull, drill array. Reach the Main Belt!",
 		"cost":         600_000.0,
 		"tap_bonus":    500.0,
+		"ship_tier":    3,
 		"unlocks_zone": 2,
 	},
 	{
 		"name":         "Ion Drive Ship",
-		"description":  "High-efficiency drive. Reach the Trojan Clusters! Mine +2,000 credits.",
+		"description":  "High-efficiency drive. Reach the Trojan Clusters!",
 		"cost":         7_000_000.0,
 		"tap_bonus":    2_000.0,
+		"ship_tier":    4,
 		"unlocks_zone": 3,
 	},
 	{
 		"name":         "Warp Freighter",
-		"description":  "Fold space, unlimited range. Reach the Kuiper Belt! Mine +10,000 credits.",
+		"description":  "Fold space, unlimited range. Reach the Kuiper Belt!",
 		"cost":         80_000_000.0,
 		"tap_bonus":    10_000.0,
+		"ship_tier":    5,
 		"unlocks_zone": 4,
 	},
 ]

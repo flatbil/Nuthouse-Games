@@ -56,6 +56,7 @@ func _ready() -> void:
 	EventBus.offline_income_collected.connect(_on_offline_income)
 	EventBus.game_ended.connect(_on_game_ended)
 	EventBus.credits_mined.connect(_on_credits_mined)
+	EventBus.mine_blocked.connect(_on_mine_blocked)
 	AdManager.loan_rewarded.connect(_on_loan_rewarded)
 	EventBus.zone_changed.connect(_on_zone_changed)
 
@@ -188,6 +189,23 @@ func _show_zone_banner(zone_name: String) -> void:
 	lbl.queue_free()
 
 
+func _on_mine_blocked(world_pos: Vector2) -> void:
+	var screen_pos := get_viewport().get_canvas_transform() * world_pos
+	var lbl := Label.new()
+	lbl.text = "UPGRADE SHIP!"
+	lbl.add_theme_font_size_override("font_size", 18)
+	lbl.add_theme_color_override("font_color", Color(1.0, 0.35, 0.2, 1.0))
+	lbl.position     = screen_pos - Vector2(60.0, 32.0)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$HUD.add_child(lbl)
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(lbl, "position:y", screen_pos.y - 90.0, 0.9).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(lbl, "modulate:a", 0.0, 0.5).set_delay(0.4)
+	await tween.finished
+	lbl.queue_free()
+
+
 func _on_credits_mined(world_pos: Vector2, amount: float) -> void:
 	var screen_pos := get_viewport().get_canvas_transform() * world_pos
 	var lbl := Label.new()
@@ -229,9 +247,12 @@ func _update_stage(amount: float) -> void:
 func _spawn_asteroids() -> void:
 	for child in asteroid_field.get_children():
 		child.queue_free()
-	var zone: Dictionary = GameConfig.ZONES[GameManager.current_zone]
+	var zone_idx: int    = GameManager.current_zone
+	var zone: Dictionary = GameConfig.ZONES[zone_idx]
+	var t: int           = zone_idx + 1   # zone 0 → T1, zone 4 → T5
 	for i in range(ASTEROID_COUNT):
 		var asteroid := ASTEROID_SCENE.instantiate()
+		asteroid.tier = t   # set before _ready() runs
 		var angle    := (TAU / float(ASTEROID_COUNT)) * float(i) + randf() * 0.4
 		var dist     := randf_range(float(zone["radius_min"]), float(zone["radius_max"]))
 		asteroid.position = Vector2(cos(angle), sin(angle)) * dist
