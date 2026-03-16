@@ -26,8 +26,14 @@ extends Node2D
 # ── Asteroid spawning ───────────────────────────────────
 const ASTEROID_SCENE   := preload("res://scenes/Asteroid.tscn")
 const ASTEROID_COUNT   := 14
-const SPAWN_RADIUS_MIN := 90.0
-const SPAWN_RADIUS_MAX := 320.0
+
+# ── Orbital 3-D perspective ──────────────────────────────
+# Side-view compression: the orbit circle seen from the side becomes an ellipse.
+# ry = rx * ORBIT_RY_RATIO  (smaller = more edge-on, flatter)
+const ORBIT_RY_RATIO   := 0.30
+
+const _PLANET_SCRIPT    := preload("res://scenes/Planet.gd")
+const _ORBITLINES_SCRIPT := preload("res://scenes/OrbitLines.gd")
 
 # ── Upgrade drawer state ────────────────────────────────
 var _collapsed: Dictionary = {
@@ -46,6 +52,11 @@ var _loan_btn:          Button = null
 var _drawer_open := false
 const _DRAWER_W  := 300.0
 
+# ── Orbital view state ───────────────────────────────────
+var _planet_node:      Node2D = null
+var _orbit_lines_node: Node2D = null
+var _last_player_x:    float  = 0.0
+
 
 func _ready() -> void:
 	EventBus.resource_changed.connect(_on_resource_changed)
@@ -60,6 +71,7 @@ func _ready() -> void:
 	AdManager.loan_rewarded.connect(_on_loan_rewarded)
 	EventBus.zone_changed.connect(_on_zone_changed)
 
+	_setup_orbital_view()
 	_apply_theme()
 	_build_upgrade_list()
 	_spawn_asteroids()
@@ -71,6 +83,11 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_refresh_loan_button()
+	# Spin planet proportional to horizontal player movement (orbital illusion)
+	if is_instance_valid(_planet_node) and is_instance_valid(player):
+		var dx := player.global_position.x - _last_player_x
+		_planet_node.spin(dx)
+		_last_player_x = player.global_position.x
 
 
 # -------------------------------------------------------
@@ -98,7 +115,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var world_pos: Vector2 = get_viewport().get_canvas_transform().affine_inverse() * screen_pos
 
 	# Snap to nearest non-depleted asteroid when tapping within range
-	const SNAP_RADIUS := 60.0
+	# Snap radius is generous since the orbit is elliptical (compressed y-axis)
+	const SNAP_RADIUS := 80.0
 	var nearest: Node2D  = null
 	var nearest_dist     := SNAP_RADIUS
 	for body in get_tree().get_nodes_in_group("asteroids"):
@@ -164,6 +182,7 @@ func _on_zone_changed(zone: int) -> void:
 	player.set_move_target(Vector2.ZERO)
 	_refresh_ui()
 	_show_zone_banner(GameConfig.ZONES[zone]["name"])
+	_refresh_orbit_lines()
 
 
 func _show_zone_banner(zone_name: String) -> void:
@@ -249,19 +268,71 @@ func _spawn_asteroids() -> void:
 		child.queue_free()
 	var zone_idx: int    = GameManager.current_zone
 	var zone: Dictionary = GameConfig.ZONES[zone_idx]
-	var t: int           = zone_idx + 1   # zone 0 → T1, zone 4 → T5
+	var t: int           = zone_idx + 1
 	for i in range(ASTEROID_COUNT):
 		var asteroid := ASTEROID_SCENE.instantiate()
-		asteroid.tier = t   # set before _ready() runs
-		var angle    := (TAU / float(ASTEROID_COUNT)) * float(i) + randf() * 0.4
-		var dist     := randf_range(float(zone["radius_min"]), float(zone["radius_max"]))
-		asteroid.position = Vector2(cos(angle), sin(angle)) * dist
+		asteroid.tier = t
+		var angle := (TAU / float(ASTEROID_COUNT)) * float(i) + randf() * 0.4
+		var rx    := randf_range(float(zone["radius_min"]), float(zone["radius_max"]))
+		var ry    := rx * ORBIT_RY_RATIO   # side-view: compress y-axis
+		asteroid.position = Vector2(cos(angle) * rx, sin(angle) * ry)
 		asteroid_field.add_child(asteroid)
+	_refresh_orbit_lines()
 
 
 # -------------------------------------------------------
 # Upgrade HUD — same accordion pattern as template
 # -------------------------------------------------------
+
+# -------------------------------------------------------
+# Orbital view setup — background planet + orbit arc lines
+# -------------------------------------------------------
+
+func _setup_orbital_view() -> void:
+	# ── Background CanvasLayer (behind world) ────────────
+	var bg := CanvasLayer.new()
+	bg.name  = "Background"
+	bg.layer = -2
+	add_child(bg)
+
+	# Star-field fill
+	var stars := ColorRect.new()
+	stars.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stars.color        = Color(0.01, 0.01, 0.04, 1.0)
+	stars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.add_child(stars)
+
+	# Planet — always screen-centered, spins with player
+	_planet_node = Node2D.new()
+	_planet_node.set_script(_PLANET_SCRIPT)
+	bg.add_child(_planet_node)
+
+	# ── Orbit arc lines in world space ───────────────────
+	_orbit_lines_node = Node2D.new()
+	_orbit_lines_node.set_script(_ORBITLINES_SCRIPT)
+	_orbit_lines_node.z_index = -2
+	$World.add_child(_orbit_lines_node)
+
+	_last_player_x = player.global_position.x
+
+
+func _refresh_orbit_lines() -> void:
+	if not is_instance_valid(_orbit_lines_node):
+		return
+	var data: Array = []
+	# Previous (unlocked) zones — faint, smaller radii
+	for z in range(GameManager.current_zone):
+		var zd: Dictionary = GameConfig.ZONES[z]
+		var rx := (float(zd["radius_min"]) + float(zd["radius_max"])) * 0.5
+		data.append({"rx": rx, "ry": rx * ORBIT_RY_RATIO,
+			"color": Color(0.35, 0.55, 0.85, 0.10)})
+	# Current zone — brighter
+	var cz: Dictionary = GameConfig.ZONES[GameManager.current_zone]
+	var crx := (float(cz["radius_min"]) + float(cz["radius_max"])) * 0.5
+	data.append({"rx": crx, "ry": crx * ORBIT_RY_RATIO,
+		"color": Color(0.45, 0.75, 1.00, 0.22)})
+	_orbit_lines_node.call("set_orbits", data)
+
 
 func _apply_theme() -> void:
 	stage_label.visible = false

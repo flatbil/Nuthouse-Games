@@ -11,7 +11,7 @@ script = ExtResource("1_script")
 [node name="AsteroidField" type="Node2D" parent="World"]
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
-position = Vector2(195, 422)
+position = Vector2(0, 0)
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
