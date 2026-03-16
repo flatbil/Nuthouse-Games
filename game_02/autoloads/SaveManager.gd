@@ -26,6 +26,7 @@ func save() -> void:
 		"track_b_owned":           GameManager.track_b_owned,
 		"track_c_purchased":       GameManager.track_c_purchased,
 		"track_d_purchased":       GameManager.track_d_purchased,
+		"current_zone":            GameManager.current_zone,
 		"last_save_time":          Time.get_unix_time_from_system(),
 	}
 	var file := FileAccess.open(GameConfig.SAVE_FILE, FileAccess.WRITE)

@@ -14,6 +14,7 @@ extends Node2D
 @onready var rate_label:       Label          = $HUD/TopHUD/Stats/RateLabel
 @onready var per_sec_label:    Label          = $HUD/TopHUD/Stats/PerSecLabel
 @onready var days_label:       Label          = $HUD/TopHUD/Stats/DaysLabel
+@onready var zone_label:       Label          = $HUD/TopHUD/Stats/ZoneLabel
 @onready var upgrade_list:     VBoxContainer  = $HUD/UpgradeDrawer/ScrollContainer/UpgradeList
 @onready var upgrade_drawer:   PanelContainer = $HUD/UpgradeDrawer
 @onready var stage_label:      Label          = $HUD/StageLabel
@@ -56,6 +57,7 @@ func _ready() -> void:
 	EventBus.game_ended.connect(_on_game_ended)
 	EventBus.credits_mined.connect(_on_credits_mined)
 	AdManager.loan_rewarded.connect(_on_loan_rewarded)
+	EventBus.zone_changed.connect(_on_zone_changed)
 
 	_apply_theme()
 	_build_upgrade_list()
@@ -156,6 +158,36 @@ func _on_loan_rewarded(_amount: float) -> void:
 	pass
 
 
+func _on_zone_changed(zone: int) -> void:
+	_spawn_asteroids()
+	player.set_move_target(Vector2.ZERO)
+	_refresh_ui()
+	_show_zone_banner(GameConfig.ZONES[zone]["name"])
+
+
+func _show_zone_banner(zone_name: String) -> void:
+	var lbl := Label.new()
+	lbl.text = "ORBIT REACHED\n%s" % zone_name
+	lbl.add_theme_font_size_override("font_size", 26)
+	lbl.add_theme_color_override("font_color", _GOLD)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
+	lbl.mouse_filter         = Control.MOUSE_FILTER_IGNORE
+	lbl.set_anchors_preset(Control.PRESET_CENTER)
+	lbl.offset_left   = -160.0
+	lbl.offset_right  =  160.0
+	lbl.offset_top    = -60.0
+	lbl.offset_bottom =  60.0
+	lbl.modulate.a    = 0.0
+	$HUD.add_child(lbl)
+	var tween := create_tween()
+	tween.tween_property(lbl, "modulate:a", 1.0, 0.4).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_interval(2.5)
+	tween.tween_property(lbl, "modulate:a", 0.0, 0.6)
+	await tween.finished
+	lbl.queue_free()
+
+
 func _on_credits_mined(world_pos: Vector2, amount: float) -> void:
 	var screen_pos := get_viewport().get_canvas_transform() * world_pos
 	var lbl := Label.new()
@@ -195,10 +227,13 @@ func _update_stage(amount: float) -> void:
 # -------------------------------------------------------
 
 func _spawn_asteroids() -> void:
+	for child in asteroid_field.get_children():
+		child.queue_free()
+	var zone: Dictionary = GameConfig.ZONES[GameManager.current_zone]
 	for i in range(ASTEROID_COUNT):
 		var asteroid := ASTEROID_SCENE.instantiate()
 		var angle    := (TAU / float(ASTEROID_COUNT)) * float(i) + randf() * 0.4
-		var dist     := randf_range(SPAWN_RADIUS_MIN, SPAWN_RADIUS_MAX)
+		var dist     := randf_range(float(zone["radius_min"]), float(zone["radius_max"]))
 		asteroid.position = Vector2(cos(angle), sin(angle)) * dist
 		asteroid_field.add_child(asteroid)
 
@@ -339,13 +374,17 @@ func _refresh_track_button(track: int, index: int) -> void:
 	if btn == null: return
 
 	match track:
-		0:   # Drills — one-time mine yield booster
+		0:   # Spacecraft — one-time mine yield + optional zone unlock
 			var item: Dictionary = GameConfig.TRACK_A[index]
 			if GameManager.track_a_purchased[index]:
 				_set_btn(btn, "%s  [Equipped]" % item["name"], true)
 			else:
+				var zone_idx: int = int(item.get("unlocks_zone", -1))
+				var zone_tag: String = ""
+				if zone_idx >= 0:
+					zone_tag = "  ★ Unlocks %s" % GameConfig.ZONES[zone_idx]["name"]
 				_set_btn(btn,
-					"%s — %s — Cost: %s" % [item["name"], item["description"], _cur(item["cost"])],
+					"%s — %s%s — Cost: %s" % [item["name"], item["description"], zone_tag, _cur(item["cost"])],
 					not GameManager.can_afford(0, index))
 		1:   # Drones — repeatable generators
 			var item: Dictionary = GameConfig.TRACK_B[index]
@@ -399,6 +438,11 @@ func _refresh_ui() -> void:
 		per_sec_label.text = "%s / sec" % _cur(GameManager.passive_rate)
 	_refresh_all_buttons()
 	_update_stage(GameManager.resources)
+	if is_instance_valid(zone_label):
+		zone_label.text = "Orbit: %s  ×%.0f" % [
+			GameConfig.ZONES[GameManager.current_zone]["name"],
+			GameConfig.ZONES[GameManager.current_zone]["ore_multiplier"],
+		]
 
 
 # ── Loan button ─────────────────────────────────────────

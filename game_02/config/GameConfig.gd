@@ -43,10 +43,24 @@ const GOAL_AGE            := 49.0       # mission years (same as game_01 career 
 
 # ── Section Titles ─────────────────────────────────────────────
 
-const TRACK_A_TITLE := "DRILLS"
-const TRACK_B_TITLE := "DRONES"
-const TRACK_C_TITLE := "SHIP MODS"
-const TRACK_D_TITLE := "EXOSUIT"
+const TRACK_A_TITLE := "SPACECRAFT"
+const TRACK_B_TITLE := "MINING FLEET"
+const TRACK_C_TITLE := "SHIP SYSTEMS"
+const TRACK_D_TITLE := "PILOT SKILLS"
+
+
+# ── Orbital Zones ──────────────────────────────────────────────
+# Each zone is a ring of asteroids at a greater orbital radius.
+# ore_multiplier scales ALL income (active + passive) when in that zone.
+# Unlocked by buying the corresponding TRACK_A spacecraft.
+
+const ZONES: Array = [
+	{"name": "Near-Earth Debris",   "radius_min":  80, "radius_max": 130, "ore_multiplier":    1.0},
+	{"name": "Inner Asteroid Belt", "radius_min": 170, "radius_max": 240, "ore_multiplier":    6.0},
+	{"name": "Main Belt",           "radius_min": 290, "radius_max": 390, "ore_multiplier":   40.0},
+	{"name": "Trojan Clusters",     "radius_min": 430, "radius_max": 560, "ore_multiplier":  300.0},
+	{"name": "Kuiper Belt",         "radius_min": 640, "radius_max": 820, "ore_multiplier": 2500.0},
+]
 
 
 # ── Wealth / Progress Stages ───────────────────────────────────
@@ -67,83 +81,91 @@ const STAGES: Array = [
 ]
 
 
-# ── Track A — Mining Drills ────────────────────────────────────
-# One-time purchases that permanently increase mine yield (tap_bonus).
+# ── Track A — Spacecraft ───────────────────────────────────────
+# One-time purchases. Each adds tap_bonus to mine yield.
+# Items with unlocks_zone >= 0 also open a new orbital zone
+# (multiplying ALL income by that zone's ore_multiplier).
 
 const TRACK_A: Array = [
 	{
-		"name":        "Rock Hammer",
-		"description": "A trusty hammer. Mine +2 credits.",
-		"cost":        40.0,
-		"tap_bonus":   2.0,
+		"name":         "Mining Toolkit",
+		"description":  "Better tools for your suit. Mine +10 credits.",
+		"cost":         350.0,
+		"tap_bonus":    10.0,
+		"unlocks_zone": -1,
 	},
 	{
-		"name":        "Drill Bit",
-		"description": "Upgraded tool. Mine +10 credits.",
-		"cost":        350.0,
-		"tap_bonus":   10.0,
+		"name":         "EVA Jetpack",
+		"description":  "Boost mobility in zero-g. Mine +35 credits.",
+		"cost":         4_000.0,
+		"tap_bonus":    35.0,
+		"unlocks_zone": -1,
 	},
 	{
-		"name":        "Plasma Cutter",
-		"description": "Slices rock clean. Mine +35 credits.",
-		"cost":        4_000.0,
-		"tap_bonus":   35.0,
+		"name":         "Scout Rocket",
+		"description":  "Your first real ship. Reach the Inner Belt! Mine +120 credits.",
+		"cost":         50_000.0,
+		"tap_bonus":    120.0,
+		"unlocks_zone": 1,
 	},
 	{
-		"name":        "Laser Array",
-		"description": "Precision mining laser. Mine +120 credits.",
-		"cost":        35_000.0,
-		"tap_bonus":   120.0,
+		"name":         "Mining Vessel",
+		"description":  "Pressurised hull, drill array. Reach the Main Belt! Mine +500 credits.",
+		"cost":         600_000.0,
+		"tap_bonus":    500.0,
+		"unlocks_zone": 2,
 	},
 	{
-		"name":        "Quantum Extractor",
-		"description": "Atomic-level extraction. Mine +500 credits.",
-		"cost":        280_000.0,
-		"tap_bonus":   500.0,
+		"name":         "Ion Drive Ship",
+		"description":  "High-efficiency drive. Reach the Trojan Clusters! Mine +2,000 credits.",
+		"cost":         7_000_000.0,
+		"tap_bonus":    2_000.0,
+		"unlocks_zone": 3,
 	},
 	{
-		"name":        "Dark Matter Drill",
-		"description": "Reality-bending tech. Mine +2,000 credits.",
-		"cost":        2_500_000.0,
-		"tap_bonus":   2_000.0,
+		"name":         "Warp Freighter",
+		"description":  "Fold space, unlimited range. Reach the Kuiper Belt! Mine +10,000 credits.",
+		"cost":         80_000_000.0,
+		"tap_bonus":    10_000.0,
+		"unlocks_zone": 4,
 	},
 ]
 
 
-# ── Track B — Mining Drones ────────────────────────────────────
-# Repeatable passive generators. Each unit adds income_per_sec.
+# ── Track B — Mining Fleet ─────────────────────────────────────
+# Repeatable. Each unit adds income_per_sec (before zone multiplier).
 
 const TRACK_B: Array = [
 	{
-		"name":           "Scout Drone",
+		"name":           "Survey Probe",
 		"description":    "+0.25 credits/sec each",
 		"base_cost":      75.0,
 		"growth_rate":    1.14,
 		"income_per_sec": 0.25,
 	},
 	{
-		"name":           "Harvester Bot",
+		"name":           "Mining Drone",
 		"description":    "+3 credits/sec each",
 		"base_cost":      900.0,
 		"growth_rate":    1.14,
 		"income_per_sec": 3.0,
 	},
 	{
-		"name":           "Mining Pod",
+		"name":           "Harvester Bot",
 		"description":    "+45 credits/sec each",
 		"base_cost":      12_000.0,
 		"growth_rate":    1.14,
 		"income_per_sec": 45.0,
 	},
 	{
-		"name":           "Ore Processor",
+		"name":           "Automated Rig",
 		"description":    "+700 credits/sec each",
 		"base_cost":      160_000.0,
 		"growth_rate":    1.14,
 		"income_per_sec": 700.0,
 	},
 	{
-		"name":           "Asteroid Ripper",
+		"name":           "Swarm Network",
 		"description":    "+11,000 credits/sec each",
 		"base_cost":      2_200_000.0,
 		"growth_rate":    1.14,
@@ -152,68 +174,67 @@ const TRACK_B: Array = [
 ]
 
 
-# ── Track C — Ship Upgrades ────────────────────────────────────
-# One-time multipliers on total passive (drone) income.
+# ── Track C — Ship Systems ─────────────────────────────────────
+# One-time multipliers on total fleet (passive) income.
 
 const TRACK_C: Array = [
 	{
-		"name":        "Cargo Bay Upgrade",
-		"description": "2x all drone output",
+		"name":        "Ore Processor",
+		"description": "2x all fleet output",
 		"cost":        10_000.0,
 		"multiplier":  2.0,
 	},
 	{
-		"name":        "Ore Refinery",
-		"description": "3x all drone output",
+		"name":        "Quantum Refinery",
+		"description": "3x all fleet output",
 		"cost":        500_000.0,
 		"multiplier":  3.0,
 	},
 	{
-		"name":        "Nanite Processors",
-		"description": "5x all drone output",
+		"name":        "AI Mining Core",
+		"description": "5x all fleet output",
 		"cost":        18_000_000.0,
 		"multiplier":  5.0,
 	},
 ]
 
 
-# ── Track D — Exosuit Upgrades ────────────────────────────────
-# One-time multipliers on manual mine yield. Keeps active play
-# competitive with passive drone income at late game.
+# ── Track D — Pilot Skills ─────────────────────────────────────
+# One-time multipliers on manual mine yield.
 
 const TRACK_D: Array = [
 	{
-		"name":        "Exo-Skeleton",
+		"name":        "Navigation Computer",
 		"description": "2x mine yield",
 		"cost":        1_500_000.0,
 		"multiplier":  2.0,
 	},
 	{
-		"name":        "Thruster Pack",
+		"name":        "Predictive Mining AI",
 		"description": "3x mine yield",
 		"cost":        18_000_000.0,
 		"multiplier":  3.0,
 	},
 	{
-		"name":        "Quantum Suit",
+		"name":        "Neural Interface",
 		"description": "5x mine yield",
 		"cost":        180_000_000.0,
 		"multiplier":  5.0,
 	},
 	{
-		"name":        "Void Armor",
+		"name":        "Quantum Targeting",
 		"description": "8x mine yield",
 		"cost":        1_800_000_000.0,
 		"multiplier":  8.0,
 	},
 	{
-		"name":        "Singularity Harness",
+		"name":        "Singularity Drive",
 		"description": "15x mine yield",
 		"cost":        18_000_000_000.0,
 		"multiplier":  15.0,
 	},
 	{
-		"name":        "God-Particle Suit",
+		"name":        "Transcendence",
 		"description": "25x mine yield",
 		"cost":        180_000_000_000.0,
 		"multiplier":  25.0,

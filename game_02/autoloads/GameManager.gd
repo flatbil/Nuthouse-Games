@@ -24,6 +24,8 @@ var track_b_owned:     Array = []   # int  — repeatable drone generators
 var track_c_purchased: Array = []   # bool — one-time passive multipliers
 var track_d_purchased: Array = []   # bool — one-time mine multipliers
 
+var current_zone: int = 0
+
 
 func _ready() -> void:
 	track_a_purchased.resize(GameConfig.TRACK_A.size())
@@ -48,6 +50,7 @@ func reset() -> void:
 	track_b_owned.fill(0)
 	track_c_purchased.fill(false)
 	track_d_purchased.fill(false)
+	current_zone = 0
 	EventBus.resource_changed.emit(resources)
 	EventBus.tap_value_changed.emit(tap_value)
 	EventBus.passive_rate_changed.emit(passive_rate)
@@ -118,6 +121,11 @@ func buy_item(track: int, index: int) -> void:
 		0:
 			track_a_purchased[index] = true
 			tap_value += float(GameConfig.TRACK_A[index]["tap_bonus"])
+			var unlocks: int = int(GameConfig.TRACK_A[index].get("unlocks_zone", -1))
+			if unlocks >= 0 and unlocks > current_zone:
+				current_zone = unlocks
+				_recalculate_passive_rate()
+				EventBus.zone_changed.emit(current_zone)
 			EventBus.tap_value_changed.emit(tap_value)
 		1:
 			total_invested    += cost
@@ -153,8 +161,12 @@ func get_tap_multiplier() -> float:
 	return mult
 
 
+func get_zone_multiplier() -> float:
+	return float(GameConfig.ZONES[current_zone]["ore_multiplier"])
+
+
 func get_effective_tap_value() -> float:
-	return tap_value * get_tap_multiplier()
+	return tap_value * get_tap_multiplier() * get_zone_multiplier()
 
 
 func get_passive_multiplier() -> float:
@@ -173,7 +185,7 @@ func _recalculate_passive_rate() -> void:
 	var base := 0.0
 	for i in range(GameConfig.TRACK_B.size()):
 		base += float(track_b_owned[i]) * float(GameConfig.TRACK_B[i]["income_per_sec"])
-	passive_rate = base * get_passive_multiplier()
+	passive_rate = base * get_passive_multiplier() * get_zone_multiplier()
 	EventBus.passive_rate_changed.emit(passive_rate)
 
 
@@ -202,6 +214,8 @@ func _load_game() -> void:
 	var saved_d: Array = data.get("track_d_purchased", [])
 	for i in range(min(saved_d.size(), track_d_purchased.size())):
 		track_d_purchased[i] = bool(saved_d[i])
+
+	current_zone = int(data.get("current_zone", 0))
 
 	# Rebuild tap_value from purchased drills
 	tap_value = 1.0
