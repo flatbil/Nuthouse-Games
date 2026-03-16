@@ -24,8 +24,9 @@ var track_b_owned:     Array = []   # int  — repeatable drone generators
 var track_c_purchased: Array = []   # bool — one-time passive multipliers
 var track_d_purchased: Array = []   # bool — one-time mine multipliers
 
-var current_zone: int = 0
-var ship_tier:    int = 1   # increases when spacecraft with higher ship_tier are purchased
+var current_zone:    int   = 0
+var ship_tier:       int   = 1   # increases when spacecraft with higher ship_tier are purchased
+var orbit_rotation:  float = 0.0  # current orbital view angle (radians); not saved
 
 
 func _ready() -> void:
@@ -51,8 +52,9 @@ func reset() -> void:
 	track_b_owned.fill(0)
 	track_c_purchased.fill(false)
 	track_d_purchased.fill(false)
-	current_zone = 0
-	ship_tier    = 1
+	current_zone   = 0
+	ship_tier      = 1
+	orbit_rotation = 0.0
 	EventBus.resource_changed.emit(resources)
 	EventBus.tap_value_changed.emit(tap_value)
 	EventBus.passive_rate_changed.emit(passive_rate)

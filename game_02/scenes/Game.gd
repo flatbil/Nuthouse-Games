@@ -55,7 +55,6 @@ const _DRAWER_W  := 300.0
 # ── Orbital view state ───────────────────────────────────
 var _planet_node:      Node2D = null
 var _orbit_lines_node: Node2D = null
-var _last_player_x:    float  = 0.0
 
 
 func _ready() -> void:
@@ -81,13 +80,28 @@ func _ready() -> void:
 	_style_hamburger_btn()
 
 
-func _process(_delta: float) -> void:
+const ORBIT_ROTATE_SPEED := 1.6   # radians per second for A/D input
+
+func _process(delta: float) -> void:
 	_refresh_loan_button()
-	# Spin planet proportional to horizontal player movement (orbital illusion)
-	if is_instance_valid(_planet_node) and is_instance_valid(player):
-		var dx := player.global_position.x - _last_player_x
-		_planet_node.spin(dx)
-		_last_player_x = player.global_position.x
+	_update_orbit_rotation(delta)
+
+
+func _update_orbit_rotation(delta: float) -> void:
+	var dir := 0.0
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  dir -= 1.0
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): dir += 1.0
+	if dir != 0.0:
+		GameManager.orbit_rotation += dir * ORBIT_ROTATE_SPEED * delta
+
+	# Rotate the asteroid field and orbit lines together
+	asteroid_field.rotation     = GameManager.orbit_rotation
+	if is_instance_valid(_orbit_lines_node):
+		_orbit_lines_node.rotation = GameManager.orbit_rotation
+
+	# Planet matches the orbit rotation exactly (stays in sync)
+	if is_instance_valid(_planet_node):
+		_planet_node.rotation = GameManager.orbit_rotation
 
 
 # -------------------------------------------------------
@@ -121,6 +135,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	var nearest_dist     := SNAP_RADIUS
 	for body in get_tree().get_nodes_in_group("asteroids"):
 		if body is Node2D and not (body as Node).get("_is_depleted"):
+			# Only snap to foreground asteroids
+			if body.has_method("is_in_foreground") and not body.is_in_foreground():
+				continue
 			var d: float = (body as Node2D).global_position.distance_to(world_pos)
 			if d < nearest_dist:
 				nearest_dist = d
@@ -311,8 +328,6 @@ func _setup_orbital_view() -> void:
 	_orbit_lines_node.set_script(_ORBITLINES_SCRIPT)
 	_orbit_lines_node.z_index = -2
 	$World.add_child(_orbit_lines_node)
-
-	_last_player_x = player.global_position.x
 
 
 func _refresh_orbit_lines() -> void:

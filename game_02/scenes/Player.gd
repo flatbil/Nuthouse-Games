@@ -16,16 +16,19 @@ extends CharacterBody2D
 #   Adjust both after importing sprites to match sprite size.
 # -------------------------------------------------------
 
-const SPEED        := 120.0
-const MINE_INTERVAL := 0.5   # seconds between mine ticks while in range
+const SPEED           := 120.0
+const MINE_INTERVAL   := 0.5    # seconds between mine ticks while in range
+const CAMERA_DRIFT    := 28.0   # max pixel offset toward rotation direction
 
 var move_target:       Vector2        = Vector2.ZERO
 var current_asteroid:  StaticBody2D   = null
 var _mine_timer:       float          = 0.0
 var _is_moving:        bool           = false
+var _cam_offset_target: Vector2       = Vector2.ZERO
 
 @onready var sprite:     AnimatedSprite2D = $Sprite
 @onready var mine_area:  Area2D           = $MineArea
+@onready var camera:     Camera2D         = $Camera
 
 
 func _ready() -> void:
@@ -50,19 +53,23 @@ func set_move_target(world_pos: Vector2) -> void:
 # -------------------------------------------------------
 
 func _update_movement() -> void:
-	# WASD / arrow keys — direct control on desktop
+	# W/S move the player toward/away from the orbital centre.
+	# A/D are handled by Game.gd to rotate the orbit — NOT character movement.
 	var dir := Vector2.ZERO
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    dir.y -= 1.0
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  dir.y += 1.0
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  dir.x -= 1.0
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): dir.x += 1.0
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):   dir.y -= 1.0
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): dir.y += 1.0
+
+	# Camera drifts slightly toward the rotation direction for depth feedback
+	var rot_dir := 0.0
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  rot_dir -= 1.0
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): rot_dir += 1.0
+	_cam_offset_target = Vector2(rot_dir * CAMERA_DRIFT, 0.0)
+	camera.offset = camera.offset.lerp(_cam_offset_target, 0.12)
 
 	if dir != Vector2.ZERO:
 		velocity    = dir.normalized() * SPEED
-		move_target = global_position   # cancel any tap target
+		move_target = global_position
 		_is_moving  = true
-		if sprite and sprite.sprite_frames:
-			sprite.flip_h = velocity.x < 0.0
 		move_and_slide()
 		return
 
@@ -89,7 +96,10 @@ func _update_mining(delta: float) -> void:
 		_mine_timer = 0.0
 		return
 
-	# Block mining if ship tier is too low for this asteroid
+	# Block mining if asteroid is in background or ship tier is too low
+	if current_asteroid.has_method("is_in_foreground") \
+			and not current_asteroid.is_in_foreground():
+		return
 	if current_asteroid.has_method("can_be_mined_by") \
 			and not current_asteroid.can_be_mined_by(GameManager.ship_tier):
 		return
@@ -131,8 +141,10 @@ func _on_mine_area_body_entered(body: Node) -> void:
 	# Only latch on to one asteroid at a time
 	if body != self and current_asteroid == null and body is StaticBody2D:
 		current_asteroid = body as StaticBody2D
-		# Immediately signal and show visual if this asteroid is too tough
-		if current_asteroid.has_method("can_be_mined_by") \
+		# Show upgrade prompt only when visible but wrong tier (not for background asteroids)
+		var in_fg: bool = not current_asteroid.has_method("is_in_foreground") \
+				or current_asteroid.is_in_foreground()
+		if in_fg and current_asteroid.has_method("can_be_mined_by") \
 				and not current_asteroid.can_be_mined_by(GameManager.ship_tier):
 			current_asteroid.show_blocked()
 			EventBus.mine_blocked.emit(global_position)

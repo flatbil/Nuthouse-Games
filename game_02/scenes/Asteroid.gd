@@ -55,6 +55,12 @@ func _process(delta: float) -> void:
 
 # ── Public API ─────────────────────────────────────────
 
+# True when asteroid is in the front half of its orbit (visible, not behind planet).
+func is_in_foreground() -> bool:
+	var depth: float = (sin(orbit_angle + GameManager.orbit_rotation) + 1.0) * 0.5
+	return depth >= 0.45
+
+
 func can_be_mined_by(ship_tier: int) -> bool:
 	return ship_tier >= tier
 
@@ -90,8 +96,8 @@ func _apply_tier(t: int) -> void:
 
 
 func _update_depth() -> void:
-	# depth 0 = back of orbit, 1 = front
-	var depth: float = (sin(orbit_angle) + 1.0) * 0.5
+	# depth 0 = back of orbit, 1 = front; includes orbit_rotation from user input
+	var depth: float = (sin(orbit_angle + GameManager.orbit_rotation) + 1.0) * 0.5
 	var s:     float = _base_scale * lerp(0.12, 1.0, depth)
 	scale = Vector2(s, s)
 	var tc: Color = GameConfig.ASTEROID_TIERS[tier - 1]["color"]
