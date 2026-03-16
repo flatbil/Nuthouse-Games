@@ -275,22 +275,13 @@ func _apply_theme() -> void:
 func _make_btn(min_h: int = 52) -> Button:
 	var btn := Button.new()
 	btn.custom_minimum_size = Vector2(0, min_h)
-	var lbl := Label.new()
-	lbl.name = "InnerLabel"
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment   = VERTICAL_ALIGNMENT_CENTER
-	btn.add_child(lbl)
+	btn.clip_text = true
 	return btn
 
 
 func _set_btn(btn: Button, t: String, disabled: bool) -> void:
-	(btn.get_node("InnerLabel") as Label).text = t
+	btn.text = t
 	btn.disabled = disabled
-	(btn.get_node("InnerLabel") as Label).modulate = \
-		Color(1, 1, 1, 0.5) if disabled else Color(1, 1, 1, 1)
 
 
 func _build_upgrade_list() -> void:
@@ -377,14 +368,12 @@ func _refresh_track_button(track: int, index: int) -> void:
 		0:   # Spacecraft — one-time mine yield + optional zone unlock
 			var item: Dictionary = GameConfig.TRACK_A[index]
 			if GameManager.track_a_purchased[index]:
-				_set_btn(btn, "%s  [Equipped]" % item["name"], true)
+				_set_btn(btn, "✓ %s  [Equipped]" % item["name"], true)
 			else:
 				var zone_idx: int = int(item.get("unlocks_zone", -1))
-				var zone_tag: String = ""
-				if zone_idx >= 0:
-					zone_tag = "  ★ Unlocks %s" % GameConfig.ZONES[zone_idx]["name"]
+				var zone_tag: String = "  ★ %s" % GameConfig.ZONES[zone_idx]["name"] if zone_idx >= 0 else ""
 				_set_btn(btn,
-					"%s — %s%s — Cost: %s" % [item["name"], item["description"], zone_tag, _cur(item["cost"])],
+					"%s%s — +%s/tap — %s" % [item["name"], zone_tag, _fmt(item["tap_bonus"]), _cur(item["cost"])],
 					not GameManager.can_afford(0, index))
 		1:   # Drones — repeatable generators
 			var item: Dictionary = GameConfig.TRACK_B[index]
@@ -392,7 +381,7 @@ func _refresh_track_button(track: int, index: int) -> void:
 			var cost: float      = GameManager.get_item_cost(1, index)
 			var t: String
 			if owned == 0:
-				t = "%s — %s — Deploy: %s" % [item["name"], item["description"], _cur(cost)]
+				t = "%s — %s — %s" % [item["name"], item["description"], _cur(cost)]
 			else:
 				var income: float = float(owned) * float(item["income_per_sec"]) * GameManager.get_passive_multiplier()
 				t = "%s [x%d] | +%s/sec | Next: %s" % [
@@ -402,18 +391,18 @@ func _refresh_track_button(track: int, index: int) -> void:
 		2:   # Ship mods — passive multipliers
 			var item: Dictionary = GameConfig.TRACK_C[index]
 			if GameManager.track_c_purchased[index]:
-				_set_btn(btn, "%s  [Installed]" % item["name"], true)
+				_set_btn(btn, "✓ %s  [Installed]" % item["name"], true)
 			else:
 				_set_btn(btn,
-					"%s — %s — Cost: %s" % [item["name"], item["description"], _cur(item["cost"])],
+					"%s — %s — %s" % [item["name"], item["description"], _cur(item["cost"])],
 					not GameManager.can_afford(2, index))
-		3:   # Exosuit — mine multipliers
+		3:   # Pilot skills — mine multipliers
 			var item: Dictionary = GameConfig.TRACK_D[index]
 			if GameManager.track_d_purchased[index]:
-				_set_btn(btn, "%s  [Equipped]" % item["name"], true)
+				_set_btn(btn, "✓ %s  [Equipped]" % item["name"], true)
 			else:
 				_set_btn(btn,
-					"%s — %s — Cost: %s" % [item["name"], item["description"], _cur(item["cost"])],
+					"%s — %s — %s" % [item["name"], item["description"], _cur(item["cost"])],
 					not GameManager.can_afford(3, index))
 
 
@@ -459,16 +448,16 @@ func _add_loan_button() -> void:
 func _refresh_loan_button() -> void:
 	if _loan_btn == null or not is_instance_valid(_loan_btn):
 		return
-	var inner := _loan_btn.get_node_or_null("InnerLabel") as Label
 	if AdManager.can_request_loan():
 		_set_btn(_loan_btn,
 			"%s — Watch Ad → +%s" % [GameConfig.AD_LOAN_LABEL, _cur(GameConfig.AD_LOAN_AMOUNT)],
 			false)
-		if inner: inner.add_theme_color_override("font_color", _GOLD)
+		_loan_btn.add_theme_color_override("font_color", _GOLD)
 	else:
 		_set_btn(_loan_btn,
 			"%s — Ready in %s" % [GameConfig.AD_LOAN_LABEL, AdManager.cooldown_label()],
 			true)
+		_loan_btn.remove_theme_color_override("font_color")
 
 
 func _on_loan_pressed() -> void:
