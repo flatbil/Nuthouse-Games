@@ -214,7 +214,7 @@ func _apply_theme() -> void:
 	top_style.bg_color                   = Color(0.06, 0.06, 0.16, 0.93)
 	top_style.corner_radius_bottom_left  = 14
 	top_style.corner_radius_bottom_right = 14
-	top_style.content_margin_left        = 16.0
+	top_style.content_margin_left        = 76.0
 	top_style.content_margin_right       = 16.0
 	top_style.content_margin_top         = 6.0
 	top_style.content_margin_bottom      = 10.0

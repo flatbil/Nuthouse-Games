@@ -1016,7 +1016,7 @@ func _apply_theme() -> void:
 	hud.bg_color                    = Color(1.0, 1.0, 1.0, 0.93)
 	hud.corner_radius_bottom_left   = 18
 	hud.corner_radius_bottom_right  = 18
-	hud.content_margin_left         = 16.0
+	hud.content_margin_left         = 76.0
 	hud.content_margin_right        = 16.0
 	hud.content_margin_top          = 6.0
 	hud.content_margin_bottom       = 10.0
