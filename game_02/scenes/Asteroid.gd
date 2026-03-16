@@ -91,8 +91,8 @@ func _apply_tier(t: int) -> void:
 
 func _update_depth() -> void:
 	# depth 0 = back of orbit, 1 = front
-	var depth := (sin(orbit_angle) + 1.0) * 0.5
-	var s     := _base_scale * lerp(0.12, 1.0, depth)
+	var depth: float = (sin(orbit_angle) + 1.0) * 0.5
+	var s:     float = _base_scale * lerp(0.12, 1.0, depth)
 	scale = Vector2(s, s)
 	var tc: Color = GameConfig.ASTEROID_TIERS[tier - 1]["color"]
 	# Tier colour tint preserved; alpha fades with depth
