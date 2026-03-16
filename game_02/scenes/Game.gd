@@ -74,7 +74,7 @@ func _process(_delta: float) -> void:
 # Input — tap in world area → move player there
 # -------------------------------------------------------
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	var screen_pos := Vector2.ZERO
 
 	if event is InputEventScreenTouch and event.pressed:
@@ -208,7 +208,7 @@ func _spawn_asteroids() -> void:
 # -------------------------------------------------------
 
 func _apply_theme() -> void:
-	stage_label.modulate.a = 0.15
+	stage_label.visible = false
 
 	var top_style := StyleBoxFlat.new()
 	top_style.bg_color                   = Color(0.06, 0.06, 0.16, 0.93)
