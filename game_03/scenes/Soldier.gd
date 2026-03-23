@@ -18,7 +18,8 @@ var _fire_timer:  float = 0.0
 var _melee_timer: float = 0.0
 var _is_alive:    bool  = true
 
-@onready var body: Sprite2D = $Body
+@onready var body:   Sprite2D = $Body
+@onready var weapon: Sprite2D = $Weapon
 
 signal died(soldier: Node)
 
@@ -42,6 +43,7 @@ func setup(type: String) -> void:
 	melee_range  = float(cfg.get("melee_range",  28.0))
 	melee_rate   = float(cfg.get("melee_rate",   0.5))
 	melee_weapon = str(cfg.get("melee_weapon", "weap_sword"))
+	weapon.texture = load("res://assets/sprites/" + melee_weapon + ".png")
 
 
 func take_damage(amount: float) -> void:
@@ -54,6 +56,16 @@ func take_damage(amount: float) -> void:
 	tween.tween_property(body, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.15)
 	if current_hp <= 0:
 		_die()
+
+
+func swing_weapon() -> void:
+	if not _is_alive or not is_instance_valid(weapon):
+		return
+	var tween := create_tween()
+	tween.tween_property(weapon, "rotation_degrees", -75.0, 0.08) \
+		.set_trans(Tween.TRANS_SINE)
+	tween.tween_property(weapon, "rotation_degrees", 0.0, 0.14) \
+		.set_trans(Tween.TRANS_BOUNCE)
 
 
 func heal(amount: float) -> void:
@@ -107,8 +119,9 @@ func _die() -> void:
 	_is_alive = false
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(body, "modulate:a", 0.0, 0.3)
-	tween.tween_property(self, "scale", Vector2(0.1, 0.1), 0.3)
+	tween.tween_property(body,   "modulate:a", 0.0, 0.3)
+	tween.tween_property(weapon, "modulate:a", 0.0, 0.3)
+	tween.tween_property(self,   "scale", Vector2(0.1, 0.1), 0.3)
 	await tween.finished
 	died.emit(self)
 	queue_free()

@@ -136,25 +136,7 @@ func _handle_melee(delta: float) -> void:
 		if is_instance_valid(best_enemy):
 			soldier._melee_timer = 0.0
 			best_enemy.take_damage(soldier.melee_damage)
-			var mid: Vector2 = (soldier.global_position + best_enemy.global_position) * 0.5
-			var angle: float = (best_enemy.global_position - soldier.global_position).angle()
-			_spawn_weapon_flash(soldier.melee_weapon, mid, angle)
-
-
-func _spawn_weapon_flash(weapon: String, pos: Vector2, angle: float) -> void:
-	var sprite := Sprite2D.new()
-	sprite.texture = load("res://assets/sprites/" + weapon + ".png")
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sprite.global_position = pos
-	sprite.rotation = angle
-	sprite.scale    = Vector2(3.0, 3.0)
-	sprite.z_index  = 10
-	get_parent().add_child(sprite)
-	var tween := sprite.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(sprite, "scale", Vector2(5.0, 5.0), 0.18)
-	tween.tween_property(sprite, "modulate:a", 0.0, 0.2)
-	tween.chain().tween_callback(sprite.queue_free)
+			soldier.swing_weapon()
 
 
 func _get_nearest_enemy() -> Node2D:
