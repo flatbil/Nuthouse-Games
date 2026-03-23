@@ -10,10 +10,12 @@ var soldiers:        Array  = []
 var facing_dir:      Vector2 = Vector2.UP
 var max_hp:          int    = 0
 var current_hp:      int    = 0    # total across all soldiers
+var _hero_node:      Node2D = null
 
 var _move_input:     Vector2 = Vector2.ZERO
 var _is_moving:      bool    = false
 var _turn_speed:     float   = 4.0   # rad/s, decreases with formation size
+var _soldier_targets: Array  = []    # target local offsets for organic lerp
 
 const BASE_SPEED     := 120.0
 const MIN_SPEED      := 55.0
@@ -37,6 +39,24 @@ func add_soldier(unit_type: String) -> void:
 	soldier.died.connect(_on_soldier_died)
 	soldiers.append(soldier)
 	_reposition_soldiers()
+	# Snap every soldier to their target on join — no lerp drift during upgrades
+	for i in range(soldiers.size()):
+		if i < _soldier_targets.size() and is_instance_valid(soldiers[i]):
+			soldiers[i].position = _soldier_targets[i]
+	_update_hp()
+	EventBus.formation_hp_changed.emit(current_hp, max_hp)
+
+
+func add_hero() -> void:
+	var hero := SOLDIER_SCENE.instantiate() as Node2D
+	add_child(hero)
+	hero.setup("hero")
+	hero.died.connect(_on_soldier_died)
+	soldiers.insert(0, hero)
+	_hero_node = hero
+	_reposition_soldiers()
+	if _soldier_targets.size() > 0:
+		hero.position = _soldier_targets[0]
 	_update_hp()
 	EventBus.formation_hp_changed.emit(current_hp, max_hp)
 
@@ -80,16 +100,41 @@ func get_center() -> Vector2:
 	return global_position
 
 
+# Returns a world-space position to aim at — random alive soldier, with a
+# small chance of targeting the hero so they remain in some danger.
+func get_random_soldier_pos() -> Vector2:
+	var alive := soldiers.filter(func(s): return is_instance_valid(s) and s._is_alive)
+	if alive.is_empty():
+		return global_position
+	# 20% chance to aim at the hero specifically
+	if is_instance_valid(_hero_node) and _hero_node._is_alive and randf() < 0.20:
+		return _hero_node.global_position
+	return alive.pick_random().global_position
+
+
 func soldier_count() -> int:
 	return soldiers.filter(func(s): return is_instance_valid(s) and s._is_alive).size()
 
 
 func _physics_process(delta: float) -> void:
 	_handle_movement(delta)
+	_lerp_soldiers(delta)
 	if _is_moving:
 		_handle_melee(delta)
 	else:
 		_handle_firing(delta)
+
+
+func _lerp_soldiers(delta: float) -> void:
+	for i in range(soldiers.size()):
+		var s = soldiers[i]
+		if not is_instance_valid(s) or not s._is_alive:
+			continue
+		if i >= _soldier_targets.size():
+			continue
+		# Slightly different lerp speed per soldier (6 – 9 s⁻¹) gives staggered drift
+		var spd: float = 6.0 + fmod(float(i) * 1.7, 3.0)
+		s.position = s.position.lerp(_soldier_targets[i], delta * spd)
 
 
 func _handle_movement(delta: float) -> void:
@@ -219,9 +264,10 @@ func _get_speed() -> float:
 
 func _reposition_soldiers() -> void:
 	var offsets: Array = GameConfig.get_formation_offsets(soldiers.size())
+	_soldier_targets.resize(soldiers.size())
 	for i in range(soldiers.size()):
 		if i < offsets.size() and is_instance_valid(soldiers[i]):
-			soldiers[i].position = offsets[i]
+			_soldier_targets[i] = offsets[i]
 
 
 func _update_hp() -> void:
@@ -234,10 +280,18 @@ func _update_hp() -> void:
 
 
 func _on_soldier_died(soldier: Node) -> void:
+	var death_pos: Vector2 = soldier.global_position
+	var was_hero: bool = (soldier == _hero_node)
 	soldiers.erase(soldier)
+	if was_hero:
+		_hero_node = null
 	_reposition_soldiers()
+	for i in range(soldiers.size()):
+		if i < _soldier_targets.size() and is_instance_valid(soldiers[i]):
+			soldiers[i].position = _soldier_targets[i]
 	_update_hp()
 	EventBus.soldier_killed.emit(soldier.unit_type if soldier.has_method("setup") else "unknown")
+	EventBus.entity_died.emit(death_pos, false)
 	EventBus.formation_hp_changed.emit(current_hp, max_hp)
-	if soldier_count() == 0:
+	if was_hero or soldier_count() == 0:
 		formation_destroyed.emit()

@@ -8,13 +8,15 @@ extends Node2D
 @onready var hud:          CanvasLayer = $HUD
 @onready var joy_layer:    CanvasLayer = $JoystickLayer
 
-const ENEMY_SCENE    := preload("res://scenes/Enemy.tscn")
-const FORMATION_SCENE := preload("res://scenes/Formation.tscn")
+const ENEMY_SCENE       := preload("res://scenes/Enemy.tscn")
+const FORMATION_SCENE   := preload("res://scenes/Formation.tscn")
+const COLLECTIBLE_SCENE := preload("res://scenes/Collectible.tscn")
 
 # ── HUD refs (built in _ready) ────────────────────────
 var _wave_label:      Label   = null
 var _hp_label:        Label   = null
 var _hoard_label:     Label   = null
+var _gems_label:      Label   = null
 var _wave_banner:     Label   = null
 var _upgrade_panel:   Control = null
 
@@ -40,13 +42,22 @@ const SPAWN_INTERVAL  := 0.8
 # ── Game state ────────────────────────────────────────
 var _game_over:       bool  = false
 var _upgrade_pending: bool  = false
+var _is_paused:       bool  = false
+var _sound_muted:     bool  = false
+var _pause_panel:     Control = null
+var _sound_btn:       Button  = null
 
 
 func _ready() -> void:
 	EventBus.enemy_killed.connect(_on_enemy_killed)
 	EventBus.formation_hp_changed.connect(_on_hp_changed)
+	EventBus.entity_died.connect(_on_entity_died)
+	EventBus.enemy_dropped.connect(_on_enemy_dropped)
+	EventBus.gem_changed.connect(_on_gem_changed)
+	EventBus.hero_weapon_changed.connect(_on_hero_weapon_changed)
 	formation.formation_destroyed.connect(_on_formation_destroyed)
 	_build_hud()
+	_build_pause_menu()
 	_build_joystick()
 	_draw_background()
 	GameManager.start_run()
@@ -79,6 +90,7 @@ func _update_keyboard_input() -> void:
 func _setup_formation() -> void:
 	var vp: Vector2 = get_viewport_rect().size
 	formation.position = Vector2(vp.x * 0.5, vp.y * 0.75)
+	formation.add_hero()
 	for unit_type in GameManager.run_soldiers:
 		formation.add_soldier(unit_type)
 
@@ -145,6 +157,8 @@ func _on_wave_cleared() -> void:
 func _end_run(victory: bool) -> void:
 	_game_over = true
 	_run_active = false
+	get_tree().paused = false
+	_is_paused = false
 	GameManager.end_run(_current_wave)
 	_show_run_over_screen(victory)
 
@@ -194,6 +208,12 @@ func _show_run_over_screen(victory: bool) -> void:
 
 # ── Upgrade pick panel ─────────────────────────────────
 func _show_upgrade_panel() -> void:
+	# Force-unpause so upgrade buttons are always interactive
+	get_tree().paused = false
+	_is_paused = false
+	if is_instance_valid(_pause_panel):
+		_pause_panel.visible = false
+		(_pause_panel.get_meta("dim") as ColorRect).visible = false
 	var choices := GameManager.get_run_upgrade_choices(3)
 	var vp: Vector2 = get_viewport_rect().size
 	var panel := _make_panel(Vector2(320, 380), Vector2(vp.x * 0.5 - 160, vp.y * 0.5 - 190))
@@ -275,6 +295,19 @@ func _build_hud() -> void:
 	_hoard_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(_hoard_label)
 
+	# Gems label
+	_gems_label = Label.new()
+	_gems_label.add_theme_font_size_override("font_size", 16)
+	_gems_label.add_theme_color_override("font_color", Color(0.30, 0.60, 1.00))
+	_gems_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_gems_label.offset_left   = 8.0
+	_gems_label.offset_top    = 62.0
+	_gems_label.offset_right  = 180.0
+	_gems_label.offset_bottom = 86.0
+	_gems_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_gems_label.text = "♦ %d gems" % GameManager.gems
+	hud.add_child(_gems_label)
+
 	# Wave banner (center, transient)
 	_wave_banner = Label.new()
 	_wave_banner.add_theme_font_size_override("font_size", 28)
@@ -290,7 +323,101 @@ func _build_hud() -> void:
 	_wave_banner.modulate.a    = 0.0
 	hud.add_child(_wave_banner)
 
+	# Hamburger menu button — top-center
+	var menu_btn := Button.new()
+	menu_btn.text = "☰"
+	menu_btn.add_theme_font_size_override("font_size", 22)
+	menu_btn.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	menu_btn.offset_left   = -28.0
+	menu_btn.offset_right  =  28.0
+	menu_btn.offset_top    =  6.0
+	menu_btn.offset_bottom =  44.0
+	menu_btn.flat = true
+	menu_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	menu_btn.pressed.connect(_toggle_pause)
+	hud.add_child(menu_btn)
+
 	_update_hud()
+
+
+func _build_pause_menu() -> void:
+	var vp: Vector2 = get_viewport_rect().size
+
+	# Full-screen dim overlay
+	var overlay := ColorRect.new()
+	overlay.color        = Color(0.0, 0.0, 0.0, 0.55)
+	overlay.size         = vp
+	overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.visible      = false
+	overlay.name         = "PauseDim"
+	hud.add_child(overlay)
+
+	# Centred panel
+	var panel := _make_panel(Vector2(270, 320), Vector2(vp.x * 0.5 - 135, vp.y * 0.5 - 160))
+	panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	panel.visible      = false
+	panel.name         = "PausePanel"
+	hud.add_child(panel)
+	_pause_panel = panel
+
+	var vbox := VBoxContainer.new()
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 14)
+	panel.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "PAUSED"
+	title.add_theme_font_size_override("font_size", 26)
+	title.add_theme_color_override("font_color", GameConfig.COLOR_GOLD)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var sep := HSeparator.new()
+	vbox.add_child(sep)
+
+	var btn_resume := Button.new()
+	btn_resume.text = "Resume"
+	btn_resume.custom_minimum_size = Vector2(0, 52)
+	btn_resume.pressed.connect(_toggle_pause)
+	vbox.add_child(btn_resume)
+
+	_sound_btn = Button.new()
+	_sound_btn.text = "Sound: ON"
+	_sound_btn.custom_minimum_size = Vector2(0, 52)
+	_sound_btn.pressed.connect(_toggle_sound)
+	vbox.add_child(_sound_btn)
+
+	var btn_menu := Button.new()
+	btn_menu.text = "Main Menu"
+	btn_menu.custom_minimum_size = Vector2(0, 52)
+	btn_menu.add_theme_color_override("font_color", GameConfig.COLOR_RED)
+	btn_menu.pressed.connect(_go_to_main_menu)
+	vbox.add_child(btn_menu)
+
+	# Store overlay ref on the panel so we can show/hide it together
+	panel.set_meta("dim", overlay)
+
+
+func _toggle_pause() -> void:
+	_is_paused = not _is_paused
+	get_tree().paused = _is_paused
+	if is_instance_valid(_pause_panel):
+		_pause_panel.visible = _is_paused
+		var dim: ColorRect = _pause_panel.get_meta("dim")
+		dim.visible = _is_paused
+
+
+func _toggle_sound() -> void:
+	_sound_muted = not _sound_muted
+	AudioServer.set_bus_mute(0, _sound_muted)
+	if is_instance_valid(_sound_btn):
+		_sound_btn.text = "Sound: OFF" if _sound_muted else "Sound: ON"
+
+
+func _go_to_main_menu() -> void:
+	get_tree().paused = false
+	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 
 func _update_hud() -> void:
@@ -320,9 +447,57 @@ func _on_hp_changed(current: int, maximum: int) -> void:
 		_hp_label.text = "❤ %d / %d" % [current, maximum]
 
 
+func _on_entity_died(pos: Vector2, is_enemy: bool) -> void:
+	var p := CPUParticles2D.new()
+	p.global_position      = pos
+	p.emitting             = true
+	p.one_shot             = true
+	p.explosiveness        = 0.95
+	p.lifetime             = 0.45
+	p.amount               = 14
+	p.spread               = 180.0
+	p.initial_velocity_min = 40.0
+	p.initial_velocity_max = 110.0
+	p.scale_amount_min     = 3.0
+	p.scale_amount_max     = 6.0
+	# Red blood for enemies, blue for friendly soldiers
+	p.color = Color(0.72, 0.02, 0.02) if is_enemy else Color(0.1, 0.35, 0.85)
+	world.add_child(p)
+	var timer := get_tree().create_timer(1.5)
+	timer.timeout.connect(p.queue_free)
+
+
 func _on_formation_destroyed() -> void:
 	if not _game_over:
 		_end_run(false)
+
+
+func _on_enemy_dropped(pos: Vector2, enemy_type: String) -> void:
+	var drops: Array = GameConfig.COLLECTIBLE_DROPS.get(enemy_type, [])
+	for drop in drops:
+		if randf() <= float(drop["chance"]):
+			_spawn_collectible(pos, drop["type"], int(drop["amount"]))
+
+
+func _spawn_collectible(pos: Vector2, type: String, amount: int) -> void:
+	var c = COLLECTIBLE_SCENE.instantiate()
+	world.add_child(c)
+	c.global_position = pos
+	c.setup(type, amount, formation)
+
+
+func _on_gem_changed(total: int) -> void:
+	if is_instance_valid(_gems_label):
+		_gems_label.text = "♦ %d gems" % total
+
+
+func _on_hero_weapon_changed(weapon_id: String) -> void:
+	if weapon_id.begins_with("__found__"):
+		var wid: String = weapon_id.substr(9)
+		var w: Dictionary = GameConfig.WEAPONS.get(wid, {})
+		if not w.is_empty():
+			var rarity: String = w["rarity"]
+			_show_wave_banner("%s\n[%s]" % [w["display_name"], rarity.to_upper()])
 
 
 # ── Virtual joystick ──────────────────────────────────

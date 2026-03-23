@@ -13,6 +13,7 @@ var is_melee:       bool    = false
 var is_cavalry:     bool    = false
 var is_grenade:     bool    = false
 var grenade_radius: float   = 70.0
+var smoke_size:     float   = 1.0
 
 var _fire_timer:        float   = 0.0
 var _target:            Node2D  = null
@@ -43,6 +44,7 @@ func setup(type: String, wave: int) -> void:
 	is_cavalry    = bool(cfg.get("is_cavalry", false))
 	is_grenade    = bool(cfg.get("is_grenade", false))
 	grenade_radius = float(cfg.get("grenade_radius", 70.0))
+	smoke_size     = float(cfg.get("smoke_size", 1.0))
 	var sz: Vector2 = cfg.get("size", Vector2(18, 22))
 	var sprite_name: String = cfg.get("sprite", "tile_0151")
 	body.texture = load("res://assets/sprites/" + sprite_name + ".png")
@@ -133,9 +135,14 @@ func _shoot() -> void:
 	bullet.is_player       = false
 	bullet.is_grenade      = is_grenade
 	bullet.grenade_radius  = grenade_radius
+	bullet.smoke_size      = smoke_size
 	if is_grenade:
 		bullet.lifetime = 1.0
-	var dir: Vector2 = (_target.global_position - global_position).normalized()
+	# Aim at a random alive soldier so the formation acts as a shield
+	var aim_pos: Vector2 = _target.global_position
+	if _target.has_method("get_random_soldier_pos"):
+		aim_pos = _target.get_random_soldier_pos()
+	var dir: Vector2 = (aim_pos - global_position).normalized()
 	bullet.velocity = dir * bullet_spd
 	bullet.rotation = dir.angle()
 	get_parent().add_child(bullet)
@@ -152,6 +159,8 @@ func _die() -> void:
 	_is_alive = false
 	remove_from_group("enemies")
 	EventBus.enemy_killed.emit(global_position, reward)
+	EventBus.enemy_dropped.emit(global_position, enemy_type)
+	EventBus.entity_died.emit(global_position, true)
 	GameManager.add_run_hoard(reward)
 	var tween := create_tween()
 	tween.set_parallel(true)

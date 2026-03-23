@@ -11,6 +11,13 @@ const COLOR_GREEN    := Color(0.25, 0.75, 0.35, 1.0)
 const COLOR_DARK_BG  := Color(0.10, 0.12, 0.08, 1.0)
 const COLOR_PANEL_BG := Color(0.14, 0.16, 0.11, 0.95)
 
+const RARITY_COLORS: Dictionary = {
+	"common":    Color(0.80, 0.80, 0.80),
+	"rare":      Color(0.20, 0.55, 1.00),
+	"epic":      Color(0.70, 0.20, 0.95),
+	"legendary": Color(1.00, 0.75, 0.00),
+}
+
 # ── Unit types ─────────────────────────────────────────
 # max_hp, speed, damage, fire_rate (s), range (px), bullet_speed, color, description
 const UNIT_TYPES: Dictionary = {
@@ -25,6 +32,7 @@ const UNIT_TYPES: Dictionary = {
 		"color":        Color(0.72, 0.55, 0.30),
 		"size":         Vector2(18, 22),
 		"sprite":       "tile_0124",
+		"smoke_size":   1.0,
 		"melee_damage": 4.0,
 		"melee_range":  28.0,
 		"melee_rate":   0.5,
@@ -42,6 +50,7 @@ const UNIT_TYPES: Dictionary = {
 		"color":        Color(0.45, 0.55, 0.40),
 		"size":         Vector2(16, 20),
 		"sprite":       "tile_0122",
+		"smoke_size":   1.0,
 		"melee_damage": 2.0,
 		"melee_range":  24.0,
 		"melee_rate":   0.4,
@@ -59,6 +68,7 @@ const UNIT_TYPES: Dictionary = {
 		"color":        Color(0.20, 0.30, 0.65),
 		"size":         Vector2(18, 22),
 		"sprite":       "tile_0142",
+		"smoke_size":   2.2,
 		"melee_damage": 3.5,
 		"melee_range":  28.0,
 		"melee_rate":   0.5,
@@ -76,6 +86,7 @@ const UNIT_TYPES: Dictionary = {
 		"color":        Color(0.35, 0.55, 0.25),
 		"size":         Vector2(16, 20),
 		"sprite":       "tile_0143",
+		"smoke_size":   1.4,
 		"melee_damage": 2.5,
 		"melee_range":  26.0,
 		"melee_rate":   0.6,
@@ -93,6 +104,7 @@ const UNIT_TYPES: Dictionary = {
 		"color":        Color(0.70, 0.20, 0.15),
 		"size":         Vector2(20, 24),
 		"sprite":       "tile_0125",
+		"smoke_size":   1.0,
 		"melee_damage": 6.0,
 		"melee_range":  30.0,
 		"melee_rate":   0.7,
@@ -112,11 +124,28 @@ const UNIT_TYPES: Dictionary = {
 		"color":        Color(0.80, 0.45, 0.20),
 		"size":         Vector2(15, 19),
 		"sprite":       "tile_0120",
+		"smoke_size":   0.8,
 		"melee_damage": 3.5,
 		"melee_range":  24.0,
 		"melee_rate":   0.35,
 		"melee_weapon": "weap_axe",
 		"description":  "Fastest unit. Rapid-fire tomahawk.",
+	},
+	"hero": {
+		"display_name": "Captain",
+		"max_hp":       12,
+		"damage":       3.0,
+		"fire_rate":    1.5,
+		"range":        340.0,
+		"bullet_speed": 440.0,
+		"sprite":       "tile_0138",
+		"size":         Vector2(20, 24),
+		"smoke_size":   1.3,
+		"melee_damage": 5.0,
+		"melee_range":  32.0,
+		"melee_rate":   0.4,
+		"melee_weapon": "weap_sword",
+		"description":  "Your Captain. Leads from the front. Equip weapons to enhance.",
 	},
 }
 
@@ -148,6 +177,7 @@ const ENEMY_TYPES: Dictionary = {
 		"color":        Color(0.80, 0.12, 0.10),
 		"size":         Vector2(18, 22),
 		"sprite":       "tile_0151",
+		"smoke_size":   2.5,
 		"is_melee":     false,
 	},
 	"grenadier_enemy": {
@@ -162,6 +192,7 @@ const ENEMY_TYPES: Dictionary = {
 		"color":        Color(0.85, 0.20, 0.15),
 		"size":         Vector2(20, 25),
 		"sprite":       "tile_0153",
+		"smoke_size":   1.0,
 		"is_melee":     false,
 		"is_grenade":   true,
 		"grenade_radius": 70.0,
@@ -222,6 +253,91 @@ const RUN_UPGRADES: Array = [
 	{"id": "range_up",        "name": "Long Rifle",            "desc": "+30% range for all soldiers.",                "type": "stat",      "stat": "range",     "mult": 1.30},
 ]
 
+# ── Weapons (equippable by hero) ───────────────────────
+# Stat values are multipliers applied to hero base stats
+const WEAPONS: Dictionary = {
+	"flintlock": {
+		"display_name": "Flintlock Pistol",
+		"rarity":       "common",
+		"desc":         "Reliable sidearm. Fast fire, short range.",
+		"fire_rate":    0.80,
+		"damage":       0.90,
+		"range":        0.75,
+	},
+	"long_rifle": {
+		"display_name": "Long Rifle",
+		"rarity":       "rare",
+		"desc":         "Superior accuracy and stopping power.",
+		"fire_rate":    1.40,
+		"damage":       1.60,
+		"range":        1.50,
+	},
+	"blunderbuss": {
+		"display_name": "Blunderbuss",
+		"rarity":       "rare",
+		"desc":         "Short range devastation.",
+		"fire_rate":    0.85,
+		"damage":       2.20,
+		"range":        0.50,
+	},
+	"cavalry_pistols": {
+		"display_name": "Cavalry Pistols",
+		"rarity":       "epic",
+		"desc":         "Dual pistols. Rapid fire.",
+		"fire_rate":    0.55,
+		"damage":       0.75,
+		"range":        0.85,
+	},
+	"kentucky_rifle": {
+		"display_name": "Kentucky Rifle",
+		"rarity":       "legendary",
+		"desc":         "Master crafted. Extreme range and damage.",
+		"fire_rate":    1.60,
+		"damage":       2.80,
+		"range":        1.90,
+	},
+}
+
+# ── Uniform upgrade ────────────────────────────────────
+const UNIFORM_MAX_LEVEL   := 10
+const UNIFORM_TIER_NAMES  := [
+	"Recruit", "Recruit", "Recruit",    # 0-2
+	"Soldier", "Soldier", "Soldier",    # 3-5
+	"Veteran", "Veteran", "Veteran",    # 6-8
+	"Officer", "Officer",               # 9-10
+]
+const UNIFORM_TIER_COLORS := {
+	"Recruit": Color(0.75, 0.75, 0.75),
+	"Soldier": Color(0.20, 0.55, 1.00),
+	"Veteran": Color(0.70, 0.20, 0.95),
+	"Officer": Color(1.00, 0.75, 0.00),
+}
+
+static func uniform_upgrade_cost(level: int) -> int:
+	return 10 * (level + 1)   # 10, 20, 30 … 100 gems
+
+static func uniform_hp_bonus(level: int) -> int:
+	return level * 2           # +2 HP per level
+
+static func uniform_damage_mult(level: int) -> float:
+	return 1.0 + level * 0.08  # +8% damage per level
+
+static func uniform_speed_mult(level: int) -> float:
+	return 1.0 + level * 0.04  # +4% speed per level
+
+# ── Collectible drop tables ─────────────────────────────
+# Each entry: {type, amount, chance}  (chance 0–1 per drop roll)
+const COLLECTIBLE_DROPS: Dictionary = {
+	"skirmisher":      [{"type": "gold",   "amount": 3,  "chance": 1.00}],
+	"musketman":       [{"type": "gold",   "amount": 5,  "chance": 0.80},
+	                    {"type": "gem",    "amount": 1,  "chance": 0.20}],
+	"grenadier_enemy": [{"type": "gold",   "amount": 12, "chance": 0.70},
+	                    {"type": "gem",    "amount": 2,  "chance": 0.30}],
+	"cavalry":         [{"type": "gold",   "amount": 10, "chance": 0.60},
+	                    {"type": "gem",    "amount": 2,  "chance": 0.30},
+	                    {"type": "weapon", "amount": 1,  "chance": 0.10}],
+}
+
 # ── Meta upgrades (spend Hoard between runs) ───────────
 const META_UPGRADES: Array = [
 	{"id": "extra_recruit",  "name": "Frontier Recruitment", "desc": "Start each run with 1 extra Militiaman.",  "cost": 50,  "max_level": 2, "type": "start_unit", "unit": "militiaman"},
@@ -241,17 +357,21 @@ const META_UPGRADES: Array = [
 static func get_formation_offsets(count: int) -> Array:
 	var offsets: Array = []
 	var spacing: float = 26.0
-	# Line formation: 1 row up to 5, then 2 rows
 	var per_row: int = min(count, 5)
 	var rows: int = ceili(float(count) / float(per_row))
-	var idx: int = 0
 	for row in range(rows):
 		var in_row: int = min(per_row, count - row * per_row)
 		for col in range(in_row):
 			var x: float = (float(col) - float(in_row - 1) * 0.5) * spacing
 			var y: float = float(row) * spacing * 0.8
 			offsets.append(Vector2(x, y))
-			idx += 1
+	# Sort center-first so index 0 (hero slot) is always the centermost position
+	offsets.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+		var da: float = a.length_squared()
+		var db: float = b.length_squared()
+		if abs(da - db) < 1.0:
+			return a.x < b.x
+		return da < db)
 	return offsets
 
 # ── Difficulty scaling ─────────────────────────────────

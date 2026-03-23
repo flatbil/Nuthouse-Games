@@ -9,6 +9,7 @@ var range_px:     float   = 320.0
 var bullet_speed: float   = 420.0
 var is_grenade:    bool    = false
 var grenade_radius: float = 70.0
+var smoke_size:    float  = 1.0
 var melee_damage:  float  = 3.0
 var melee_range:   float  = 28.0
 var melee_rate:    float  = 0.5
@@ -44,6 +45,7 @@ func setup(type: String) -> void:
 	melee_rate   = float(cfg.get("melee_rate",   0.5))
 	melee_weapon = str(cfg.get("melee_weapon", "weap_sword"))
 	weapon.texture = load("res://assets/sprites/" + melee_weapon + ".png")
+	smoke_size   = float(cfg.get("smoke_size", 1.0))
 
 
 func take_damage(amount: float) -> void:
@@ -107,6 +109,7 @@ func _shoot(target: Node2D, bullet_scene: PackedScene, parent: Node) -> void:
 	bullet.is_player       = true
 	bullet.is_grenade      = is_grenade
 	bullet.grenade_radius  = grenade_radius
+	bullet.smoke_size      = smoke_size
 	if is_grenade:
 		bullet.lifetime = 1.2
 	var dir: Vector2 = (target.global_position - global_position).normalized()
