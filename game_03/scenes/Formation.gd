@@ -95,7 +95,6 @@ func _physics_process(delta: float) -> void:
 func _handle_movement(delta: float) -> void:
 	if _move_input.length() < 0.1:
 		_is_moving = false
-		# Rotation handled in firing toward enemy
 		return
 	_is_moving = true
 	var target_dir: Vector2 = _move_input.normalized()
@@ -112,17 +111,61 @@ func _handle_movement(delta: float) -> void:
 
 
 func _handle_firing(delta: float) -> void:
-	var target: Node2D = _get_nearest_enemy()
-	if not is_instance_valid(target):
+	# Formation does NOT auto-rotate — it holds the last movement direction.
+	# Each soldier independently finds the nearest enemy inside its own fire cone.
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	if enemies.is_empty():
 		return
-	# Rotate to face target
-	var to_target: Vector2 = (target.global_position - global_position).normalized()
-	var target_angle: float = to_target.angle() + PI * 0.5
-	rotation = lerp_angle(rotation, target_angle, delta * _turn_speed)
-	# Each soldier fires independently
-	for soldier in soldiers:
-		if is_instance_valid(soldier):
+	var offsets := GameConfig.get_formation_offsets(soldiers.size())
+	for i in range(soldiers.size()):
+		var soldier = soldiers[i]
+		if not is_instance_valid(soldier) or not soldier._is_alive:
+			continue
+		var cone := _soldier_fire_cone(i, offsets)
+		var target := _nearest_in_cone(enemies, soldier.global_position,
+				cone.dir, cone.half_angle)
+		if is_instance_valid(target):
 			soldier.tick_fire(delta, target, BULLET_SCENE, get_parent())
+
+
+# Returns {dir: Vector2, half_angle: float} for soldier at index idx.
+# End soldiers get a wider arc biased toward their outer flank.
+# Middle soldiers get a narrow forward-only cone.
+func _soldier_fire_cone(idx: int, offsets: Array) -> Dictionary:
+	var fwd := facing_dir if facing_dir.length() > 0.01 else Vector2.UP
+	var right := Vector2(-fwd.y, fwd.x)   # perpendicular right in world space
+	if idx >= offsets.size():
+		return {"dir": fwd, "half_angle": deg_to_rad(55.0)}
+	var ox: float = offsets[idx].x
+	# Find the maximum absolute x offset to identify edge soldiers
+	var max_ox := 0.0
+	for off in offsets:
+		max_ox = max(max_ox, abs(off.x))
+	var is_edge := max_ox > 5.0 and abs(ox) >= max_ox - 2.0
+	if is_edge:
+		# Lean cone ~25° toward outer side; wider arc so flanks are covered
+		var lean := right * sign(ox) * 0.45
+		return {"dir": (fwd + lean).normalized(), "half_angle": deg_to_rad(80.0)}
+	else:
+		return {"dir": fwd, "half_angle": deg_to_rad(50.0)}
+
+
+# Returns the nearest enemy whose bearing from `from_pos` falls inside the cone.
+func _nearest_in_cone(enemies: Array, from_pos: Vector2,
+		cone_dir: Vector2, half_angle: float) -> Node2D:
+	var best: Node2D = null
+	var best_dist: float = INF
+	for e in enemies:
+		if not is_instance_valid(e):
+			continue
+		var to_e: Vector2 = e.global_position - from_pos
+		if absf(cone_dir.angle_to(to_e.normalized())) > half_angle:
+			continue
+		var d: float = to_e.length()
+		if d < best_dist:
+			best_dist = d
+			best = e
+	return best
 
 
 func _handle_melee(delta: float) -> void:
