@@ -1,0 +1,20 @@
+[gd_scene load_steps=3 format=3 uid="uid://fb03game0001"]
+
+[ext_resource type="Script" path="res://scenes/Game.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/Formation.tscn" id="2_formation"]
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="EnemyLayer" type="Node2D" parent="."]
+
+[node name="BulletLayer" type="Node2D" parent="."]
+
+[node name="Formation" parent="." instance=ExtResource("2_formation")]
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="JoystickLayer" type="CanvasLayer" parent="."]
+layer = 10

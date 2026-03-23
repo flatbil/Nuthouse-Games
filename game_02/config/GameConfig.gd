@@ -71,11 +71,11 @@ const ASTEROID_TIERS: Array = [
 # Unlocked by buying the corresponding TRACK_A spacecraft.
 
 const ZONES: Array = [
-	{"name": "Near-Earth Debris",   "radius_min":  80, "radius_max": 130, "ore_multiplier":    1.0},
-	{"name": "Inner Asteroid Belt", "radius_min": 170, "radius_max": 240, "ore_multiplier":    6.0},
-	{"name": "Main Belt",           "radius_min": 290, "radius_max": 390, "ore_multiplier":   40.0},
-	{"name": "Trojan Clusters",     "radius_min": 430, "radius_max": 560, "ore_multiplier":  300.0},
-	{"name": "Kuiper Belt",         "radius_min": 640, "radius_max": 820, "ore_multiplier": 2500.0},
+	{"name": "Near-Earth Debris",   "radius_min":   650, "radius_max":   900, "ore_multiplier":    1.0, "planet_texture": "res://assets/textures/planets/planet_earthlike.png"},
+	{"name": "Inner Asteroid Belt", "radius_min":  1500, "radius_max":  2200, "ore_multiplier":    6.0, "planet_texture": "res://assets/textures/planets/planet_storm.png"},
+	{"name": "Main Belt",           "radius_min":  3500, "radius_max":  5000, "ore_multiplier":   40.0, "planet_texture": "res://assets/textures/planets/planet_lava.png"},
+	{"name": "Trojan Clusters",     "radius_min":  8000, "radius_max": 11000, "ore_multiplier":  300.0, "planet_texture": "res://assets/textures/planets/planet_moon.png"},
+	{"name": "Kuiper Belt",         "radius_min": 18000, "radius_max": 25000, "ore_multiplier": 2500.0, "planet_texture": "res://assets/textures/planets/planet_moon.png"},
 ]
 
 
@@ -118,6 +118,15 @@ const TRACK_A: Array = [
 		"tap_bonus":    35.0,
 		"ship_tier":    1,
 		"unlocks_zone": -1,
+	},
+	{
+		"name":           "Auto-Mining Drill",
+		"description":    "Ship auto-mines your target every 0.5s. Mine +50 credits.",
+		"cost":           8_000.0,
+		"tap_bonus":      50.0,
+		"ship_tier":      1,
+		"unlocks_zone":   -1,
+		"enables_auto_mine": true,
 	},
 	{
 		"name":         "Scout Rocket",
@@ -262,6 +271,22 @@ const TRACK_D: Array = [
 		"multiplier":  25.0,
 	},
 ]
+
+
+# ── Event Asteroid ─────────────────────────────────────────────
+
+const EVENT_ASTEROID_REWARD_MULT  := 50.0
+const EVENT_ASTEROID_LIFETIME     := 60.0
+const EVENT_ASTEROID_INTERVAL_MIN := 45.0
+const EVENT_ASTEROID_INTERVAL_MAX := 120.0
+const EVENT_ASTEROID_LABEL        := "⚡ GOLDEN ASTEROID DETECTED!"
+const EVENT_ASTEROID_COLOR        := Color(1.00, 0.88, 0.10)
+
+
+# ── Prestige ───────────────────────────────────────────────────
+
+const PRESTIGE_LABEL        := "Stellar Rebirth"
+const PRESTIGE_BONUS_PER_RUN := 0.30   # +30% all income per prestige level
 
 
 # ── Rewarded Ad / Emergency Supply Drop ───────────────────────

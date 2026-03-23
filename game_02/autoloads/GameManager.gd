@@ -27,6 +27,7 @@ var track_d_purchased: Array = []   # bool — one-time mine multipliers
 var current_zone:    int   = 0
 var ship_tier:       int   = 1   # increases when spacecraft with higher ship_tier are purchased
 var orbit_rotation:  float = 0.0  # current orbital view angle (radians); not saved
+var prestige_count:  int   = 0   # persists through resets; multiplies all income
 
 
 func _ready() -> void:
@@ -172,8 +173,33 @@ func get_zone_multiplier() -> float:
 	return float(GameConfig.ZONES[current_zone]["ore_multiplier"])
 
 
+func is_auto_mine_enabled() -> bool:
+	for i in range(GameConfig.TRACK_A.size()):
+		if GameConfig.TRACK_A[i].get("enables_auto_mine", false) and track_a_purchased[i]:
+			return true
+	return false
+
+
+func get_prestige_multiplier() -> float:
+	return 1.0 + prestige_count * GameConfig.PRESTIGE_BONUS_PER_RUN
+
+
+func can_prestige() -> bool:
+	return current_zone >= GameConfig.ZONES.size() - 1   # reached Kuiper Belt
+
+
+func prestige() -> void:
+	if not can_prestige():
+		return
+	prestige_count += 1
+	reset()                   # resets everything except prestige_count
+	_end_triggered = false    # allow the game timer to run again
+	SaveManager.save()
+	EventBus.prestige_performed.emit(prestige_count)
+
+
 func get_effective_tap_value() -> float:
-	return tap_value * get_tap_multiplier() * get_zone_multiplier()
+	return tap_value * get_tap_multiplier() * get_zone_multiplier() * get_prestige_multiplier()
 
 
 func get_passive_multiplier() -> float:
@@ -192,7 +218,7 @@ func _recalculate_passive_rate() -> void:
 	var base := 0.0
 	for i in range(GameConfig.TRACK_B.size()):
 		base += float(track_b_owned[i]) * float(GameConfig.TRACK_B[i]["income_per_sec"])
-	passive_rate = base * get_passive_multiplier() * get_zone_multiplier()
+	passive_rate = base * get_passive_multiplier() * get_zone_multiplier() * get_prestige_multiplier()
 	EventBus.passive_rate_changed.emit(passive_rate)
 
 
@@ -222,7 +248,8 @@ func _load_game() -> void:
 	for i in range(min(saved_d.size(), track_d_purchased.size())):
 		track_d_purchased[i] = bool(saved_d[i])
 
-	current_zone = int(data.get("current_zone", 0))
+	current_zone   = int(data.get("current_zone",   0))
+	prestige_count = int(data.get("prestige_count", 0))
 
 	# Rebuild tap_value and ship_tier from purchased spacecraft
 	tap_value = 1.0

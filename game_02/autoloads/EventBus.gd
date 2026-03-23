@@ -18,7 +18,8 @@ signal portfolio_changed(total_invested: float, dividends_earned: float)
 signal game_ended()
 
 # Asteroid Miner specific
-signal asteroid_depleted(position: Vector2)
+signal asteroid_depleted(position: Vector3)
 signal zone_changed(zone_index: int)
-signal credits_mined(world_pos: Vector2, amount: float)
-signal mine_blocked(world_pos: Vector2)
+signal credits_mined(world_pos: Vector3, amount: float)
+signal mine_blocked(world_pos: Vector3)
+signal prestige_performed(count: int)

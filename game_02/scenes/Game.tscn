@@ -1,17 +1,16 @@
-[gd_scene load_steps=3 format=3 uid="uid://c1am0004gamex"]
+[gd_scene load_steps=2 format=3 uid="uid://c1am0004gamex"]
 
 [ext_resource type="Script" path="res://scenes/Game.gd" id="1_script"]
-[ext_resource type="PackedScene" uid="uid://c1am0002playr" path="res://scenes/Player.tscn" id="2_player"]
 
-[node name="Game" type="Node2D"]
+[node name="Game" type="Node3D"]
 script = ExtResource("1_script")
 
-[node name="World" type="Node2D" parent="."]
+[node name="AsteroidField" type="Node3D" parent="."]
 
-[node name="AsteroidField" type="Node2D" parent="World"]
-
-[node name="Player" parent="." instance=ExtResource("2_player")]
-position = Vector2(0, 0)
+[node name="OrbitCamera" type="Camera3D" parent="."]
+fov = 65.0
+near = 1.0
+far = 10000.0
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
