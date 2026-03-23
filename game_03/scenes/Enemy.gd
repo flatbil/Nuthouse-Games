@@ -75,13 +75,18 @@ func _physics_process(delta: float) -> void:
 	var dist: float = global_position.distance_to(_target.global_position)
 
 	if is_cavalry:
-		# Charge through — keep moving
-		if _charge_dir == Vector2.ZERO:
-			_charge_dir = (_target.global_position - global_position).normalized()
+		# Re-aim toward target if heading away and far enough
+		var to_target: Vector2 = (_target.global_position - global_position).normalized()
+		if _charge_dir == Vector2.ZERO or \
+				(dist > attack_range * 3.0 and _charge_dir.dot(to_target) < -0.3):
+			_charge_dir = to_target
 		velocity = _charge_dir * speed
 		move_and_slide()
 		if dist < attack_range:
-			_melee_hit()
+			_fire_timer += delta
+			if _fire_timer >= fire_rate:
+				_fire_timer = 0.0
+				_melee_hit()
 		return
 
 	if dist > attack_range:
@@ -138,7 +143,7 @@ func _melee_hit() -> void:
 	if is_instance_valid(_target) and _target.has_method("take_formation_damage"):
 		_target.take_formation_damage(damage)
 		if is_cavalry:
-			_charge_dir = -_charge_dir * 0.5   # bounce back
+			_charge_dir = -_charge_dir.normalized()   # reverse at full speed
 
 
 func _die() -> void:
