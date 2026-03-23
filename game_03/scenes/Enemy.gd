@@ -19,7 +19,7 @@ var _target:       Node2D = null
 var _is_alive:     bool   = true
 var _charge_dir:   Vector2 = Vector2.ZERO
 
-@onready var body:    ColorRect = $Body
+@onready var body:    Sprite2D = $Body
 @onready var hp_bar:  ColorRect = $HPBar
 @onready var hp_bg:   ColorRect = $HPBarBG
 
@@ -43,11 +43,9 @@ func setup(type: String, wave: int) -> void:
 	is_grenade    = bool(cfg.get("is_grenade", false))
 	grenade_radius = float(cfg.get("grenade_radius", 70.0))
 	var sz: Vector2 = cfg.get("size", Vector2(18, 22))
-	body.color         = cfg["color"]
-	body.offset_left   = -sz.x * 0.5
-	body.offset_top    = -sz.y * 0.5
-	body.offset_right  =  sz.x * 0.5
-	body.offset_bottom =  sz.y * 0.5
+	var sprite_name: String = cfg.get("sprite", "tile_0151")
+	body.texture = load("res://assets/sprites/" + sprite_name + ".png")
+	body.scale   = sz / 16.0
 	# Resize collision to match
 	($Shape.shape as CircleShape2D).radius = sz.x * 0.55
 	_update_hp_bar()
@@ -63,8 +61,8 @@ func take_damage(amount: float) -> void:
 	current_hp -= amount
 	_update_hp_bar()
 	var tween := create_tween()
-	tween.tween_property(body, "color", Color.WHITE, 0.05)
-	tween.tween_property(body, "color", GameConfig.ENEMY_TYPES[enemy_type]["color"], 0.12)
+	tween.tween_property(body, "modulate", Color(4.0, 4.0, 4.0, 1.0), 0.05)
+	tween.tween_property(body, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.12)
 	if current_hp <= 0:
 		_die()
 
@@ -108,15 +106,15 @@ func _physics_process(delta: float) -> void:
 
 
 func _update_charge_visual() -> void:
-	# Lerp body color from base → bright yellow as shot charges up.
+	# Lerp modulate from normal → bright yellow as shot charges up.
 	# Only kicks in during the last 60% of the reload window.
 	var charge_ratio: float = _fire_timer / fire_rate
 	if charge_ratio < 0.4:
-		body.color = GameConfig.ENEMY_TYPES[enemy_type]["color"]
+		body.modulate = Color(1.0, 1.0, 1.0, 1.0)
 		return
 	var t: float = (charge_ratio - 0.4) / 0.6   # 0→1 over the warning window
-	var warn_color := Color(1.0, 0.85, 0.0) if not is_grenade else Color(1.0, 0.45, 0.0)
-	body.color = GameConfig.ENEMY_TYPES[enemy_type]["color"].lerp(warn_color, t)
+	var warn_color := Color(2.0, 1.7, 0.0, 1.0) if not is_grenade else Color(2.0, 0.9, 0.0, 1.0)
+	body.modulate = Color(1.0, 1.0, 1.0, 1.0).lerp(warn_color, t)
 
 
 func _shoot() -> void:
@@ -150,7 +148,7 @@ func _die() -> void:
 	GameManager.add_run_hoard(reward)
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(body,   "color:a", 0.0, 0.25)
+	tween.tween_property(body,   "modulate:a", 0.0, 0.25)
 	tween.tween_property(hp_bar, "modulate:a", 0.0, 0.25)
 	tween.tween_property(hp_bg,  "modulate:a", 0.0, 0.25)
 	await tween.finished

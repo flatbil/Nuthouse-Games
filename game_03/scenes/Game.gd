@@ -391,24 +391,25 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # ── Background ────────────────────────────────────────
 func _draw_background() -> void:
-	var bg := ColorRect.new()
-	bg.color = GameConfig.COLOR_DARK_BG
-	bg.size  = get_viewport_rect().size
-	bg.z_index = -10
-	world.add_child(bg)
-	# Simple grid lines for battlefield feel
-	for i in range(0, int(get_viewport_rect().size.x), 60):
-		var line := ColorRect.new()
-		line.color = Color(1.0, 1.0, 1.0, 0.03)
-		line.size  = Vector2(1.0, get_viewport_rect().size.y)
-		line.position = Vector2(i, 0)
-		world.add_child(line)
-	for j in range(0, int(get_viewport_rect().size.y), 60):
-		var line := ColorRect.new()
-		line.color = Color(1.0, 1.0, 1.0, 0.03)
-		line.size  = Vector2(get_viewport_rect().size.x, 1.0)
-		line.position = Vector2(0, j)
-		world.add_child(line)
+	var vp: Vector2 = get_viewport_rect().size
+	# Tiled grass using Kenney Tiny Battle tile
+	var grass_tex := load("res://assets/sprites/tile_0000.png") as Texture2D
+	var grass := Sprite2D.new()
+	grass.texture = grass_tex
+	grass.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	grass.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	grass.region_enabled = true
+	grass.region_rect    = Rect2(0.0, 0.0, vp.x, vp.y)
+	grass.position       = vp * 0.5
+	grass.z_index        = -10
+	world.add_child(grass)
+	# Subtle dark overlay so HUD text stays readable
+	var overlay := ColorRect.new()
+	overlay.color    = Color(0.0, 0.0, 0.0, 0.22)
+	overlay.size     = vp
+	overlay.z_index  = -9
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	world.add_child(overlay)
 
 
 # ── Helper ────────────────────────────────────────────

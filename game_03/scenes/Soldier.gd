@@ -13,7 +13,7 @@ var grenade_radius: float = 70.0
 var _fire_timer: float = 0.0
 var _is_alive:   bool  = true
 
-@onready var body: ColorRect = $Body
+@onready var body: Sprite2D = $Body
 
 signal died(soldier: Node)
 
@@ -30,21 +30,19 @@ func setup(type: String) -> void:
 	is_grenade   = bool(cfg.get("is_grenade", false))
 	grenade_radius = float(cfg.get("grenade_radius", 70.0))
 	var sz: Vector2 = cfg.get("size", Vector2(18, 22))
-	body.color          = cfg["color"]
-	body.offset_left    = -sz.x * 0.5
-	body.offset_top     = -sz.y * 0.5
-	body.offset_right   =  sz.x * 0.5
-	body.offset_bottom  =  sz.y * 0.5
+	var sprite_name: String = cfg.get("sprite", "tile_0124")
+	body.texture = load("res://assets/sprites/" + sprite_name + ".png")
+	body.scale   = sz / 16.0
 
 
 func take_damage(amount: float) -> void:
 	if not _is_alive:
 		return
 	current_hp -= amount
-	# Flash red
+	# Flash white
 	var tween := create_tween()
-	tween.tween_property(body, "color", Color.WHITE, 0.05)
-	tween.tween_property(body, "color", GameConfig.UNIT_TYPES[unit_type]["color"], 0.15)
+	tween.tween_property(body, "modulate", Color(4.0, 4.0, 4.0, 1.0), 0.05)
+	tween.tween_property(body, "modulate", Color(1.0, 1.0, 1.0, 1.0), 0.15)
 	if current_hp <= 0:
 		_die()
 
@@ -100,7 +98,7 @@ func _die() -> void:
 	_is_alive = false
 	var tween := create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(body, "color:a", 0.0, 0.3)
+	tween.tween_property(body, "modulate:a", 0.0, 0.3)
 	tween.tween_property(self, "scale", Vector2(0.1, 0.1), 0.3)
 	await tween.finished
 	died.emit(self)

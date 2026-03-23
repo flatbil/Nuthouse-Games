@@ -24,6 +24,7 @@ const UNIT_TYPES: Dictionary = {
 		"bullet_speed": 420.0,
 		"color":        Color(0.72, 0.55, 0.30),   # buckskin
 		"size":         Vector2(18, 22),
+		"sprite":       "tile_0124",
 		"description":  "Your starting unit. Reliable rifle, good range.",
 	},
 	"militiaman": {
@@ -36,6 +37,7 @@ const UNIT_TYPES: Dictionary = {
 		"bullet_speed": 380.0,
 		"color":        Color(0.45, 0.55, 0.40),   # drab green
 		"size":         Vector2(16, 20),
+		"sprite":       "tile_0122",
 		"description":  "Fast firing, low HP. Good in numbers.",
 	},
 	"continental": {
@@ -48,6 +50,7 @@ const UNIT_TYPES: Dictionary = {
 		"bullet_speed": 400.0,
 		"color":        Color(0.20, 0.30, 0.65),   # blue coat
 		"size":         Vector2(18, 22),
+		"sprite":       "tile_0142",
 		"description":  "Disciplined soldier. Steady under fire.",
 	},
 	"rifleman": {
@@ -60,6 +63,7 @@ const UNIT_TYPES: Dictionary = {
 		"bullet_speed": 550.0,
 		"color":        Color(0.35, 0.55, 0.25),   # dark green
 		"size":         Vector2(16, 20),
+		"sprite":       "tile_0143",
 		"description":  "Long range, high damage, slow reload.",
 	},
 	"grenadier": {
@@ -72,6 +76,7 @@ const UNIT_TYPES: Dictionary = {
 		"bullet_speed": 250.0,
 		"color":        Color(0.70, 0.20, 0.15),   # red coat (captured!)
 		"size":         Vector2(20, 24),
+		"sprite":       "tile_0125",
 		"description":  "Slow but devastating. Grenade arc damage.",
 		"is_grenade":   true,
 		"grenade_radius": 80.0,
@@ -86,6 +91,7 @@ const UNIT_TYPES: Dictionary = {
 		"bullet_speed": 500.0,
 		"color":        Color(0.80, 0.45, 0.20),   # copper
 		"size":         Vector2(15, 19),
+		"sprite":       "tile_0120",
 		"description":  "Fastest unit. Rapid-fire tomahawk.",
 	},
 }
@@ -103,6 +109,7 @@ const ENEMY_TYPES: Dictionary = {
 		"reward":       3,
 		"color":        Color(0.75, 0.15, 0.10),
 		"size":         Vector2(16, 20),
+		"sprite":       "tile_0149",
 		"is_melee":     true,
 	},
 	"musketman": {
@@ -116,6 +123,7 @@ const ENEMY_TYPES: Dictionary = {
 		"reward":       5,
 		"color":        Color(0.80, 0.12, 0.10),
 		"size":         Vector2(18, 22),
+		"sprite":       "tile_0151",
 		"is_melee":     false,
 	},
 	"grenadier_enemy": {
@@ -129,6 +137,7 @@ const ENEMY_TYPES: Dictionary = {
 		"reward":       12,
 		"color":        Color(0.85, 0.20, 0.15),
 		"size":         Vector2(20, 25),
+		"sprite":       "tile_0153",
 		"is_melee":     false,
 		"is_grenade":   true,
 		"grenade_radius": 70.0,
@@ -144,6 +153,7 @@ const ENEMY_TYPES: Dictionary = {
 		"reward":       10,
 		"color":        Color(0.60, 0.10, 0.10),
 		"size":         Vector2(22, 18),
+		"sprite":       "tile_0156",
 		"is_melee":     true,
 		"is_cavalry":   true,
 	},
