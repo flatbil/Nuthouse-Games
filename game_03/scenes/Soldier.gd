@@ -52,7 +52,7 @@ func heal(amount: float) -> void:
 
 
 func try_fire(target: Node2D, bullet_scene: PackedScene, parent: Node) -> void:
-	if not _is_alive:
+	if not _is_alive or not is_inside_tree():
 		return
 	_fire_timer += get_process_delta_time()
 	if _fire_timer < fire_rate:
