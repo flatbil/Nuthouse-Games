@@ -7,11 +7,16 @@ var damage:       float   = 2.5
 var fire_rate:    float   = 1.8
 var range_px:     float   = 320.0
 var bullet_speed: float   = 420.0
-var is_grenade:   bool    = false
+var is_grenade:    bool    = false
 var grenade_radius: float = 70.0
+var melee_damage:  float  = 3.0
+var melee_range:   float  = 28.0
+var melee_rate:    float  = 0.5
+var melee_weapon:  String = "weap_sword"
 
-var _fire_timer: float = 0.0
-var _is_alive:   bool  = true
+var _fire_timer:  float = 0.0
+var _melee_timer: float = 0.0
+var _is_alive:    bool  = true
 
 @onready var body: Sprite2D = $Body
 
@@ -33,6 +38,10 @@ func setup(type: String) -> void:
 	var sprite_name: String = cfg.get("sprite", "tile_0124")
 	body.texture = load("res://assets/sprites/" + sprite_name + ".png")
 	body.scale   = sz / 16.0
+	melee_damage = float(cfg.get("melee_damage", 3.0))
+	melee_range  = float(cfg.get("melee_range",  28.0))
+	melee_rate   = float(cfg.get("melee_rate",   0.5))
+	melee_weapon = str(cfg.get("melee_weapon", "weap_sword"))
 
 
 func take_damage(amount: float) -> void:
