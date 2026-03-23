@@ -49,14 +49,31 @@ func heal_all(amount: float) -> void:
 	EventBus.formation_hp_changed.emit(current_hp, max_hp)
 
 
-func take_formation_damage(amount: float) -> void:
-	# Damage a random alive soldier
+func take_formation_damage(amount: float, from_pos: Vector2 = Vector2.ZERO) -> void:
+	var mod := _direction_damage_mod(from_pos)
+	if mod <= 0.0:
+		return
 	var alive := soldiers.filter(func(s): return is_instance_valid(s) and s._is_alive)
 	if alive.is_empty():
 		return
-	alive.pick_random().take_damage(amount)
+	alive.pick_random().take_damage(amount * mod)
 	_update_hp()
 	EventBus.formation_hp_changed.emit(current_hp, max_hp)
+
+
+# Returns damage multiplier based on which direction the hit comes from.
+# facing_dir points the direction the formation is facing.
+# Front arc = immune, flanks = partial, rear = full.
+func _direction_damage_mod(from_pos: Vector2) -> float:
+	if from_pos == Vector2.ZERO or facing_dir == Vector2.ZERO:
+		return 1.0
+	var to_attacker: Vector2 = (from_pos - global_position).normalized()
+	var dot: float = facing_dir.dot(to_attacker)
+	# dot  1.0 = directly in front,  -1.0 = directly behind
+	if   dot >  0.5: return 0.0   # front cone  (~60°): immune
+	elif dot >  0.0: return 0.35  # front-flank (~90°): 35%
+	elif dot > -0.5: return 0.65  # rear-flank  (~90°): 65%
+	else:            return 1.0   # rear cone   (~60°): full
 
 
 func get_center() -> Vector2:

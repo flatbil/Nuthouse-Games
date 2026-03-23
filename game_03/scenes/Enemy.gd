@@ -14,10 +14,11 @@ var is_cavalry:     bool    = false
 var is_grenade:     bool    = false
 var grenade_radius: float   = 70.0
 
-var _fire_timer:   float  = 0.0
-var _target:       Node2D = null
-var _is_alive:     bool   = true
-var _charge_dir:   Vector2 = Vector2.ZERO
+var _fire_timer:        float   = 0.0
+var _target:            Node2D  = null
+var _is_alive:          bool    = true
+var _charge_dir:        Vector2 = Vector2.ZERO
+var _did_hit_this_pass: bool    = false
 
 @onready var body:    Sprite2D = $Body
 @onready var hp_bar:  ColorRect = $HPBar
@@ -83,10 +84,11 @@ func _physics_process(delta: float) -> void:
 		velocity = _charge_dir * speed
 		move_and_slide()
 		if dist < attack_range:
-			_fire_timer += delta
-			if _fire_timer >= fire_rate:
-				_fire_timer = 0.0
+			if not _did_hit_this_pass:
+				_did_hit_this_pass = true
 				_melee_hit()
+		else:
+			_did_hit_this_pass = false   # reset so next pass can hit
 		return
 
 	if dist > attack_range:
@@ -141,7 +143,7 @@ func _shoot() -> void:
 
 func _melee_hit() -> void:
 	if is_instance_valid(_target) and _target.has_method("take_formation_damage"):
-		_target.take_formation_damage(damage)
+		_target.take_formation_damage(damage, global_position)
 		if is_cavalry:
 			_charge_dir = -_charge_dir.normalized()   # reverse at full speed
 
