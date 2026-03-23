@@ -141,10 +141,10 @@ func _soldier_fire_cone(idx: int, offsets: Array) -> Dictionary:
 	var max_ox := 0.0
 	for off in offsets:
 		max_ox = max(max_ox, abs(off.x))
-	var is_edge := max_ox > 5.0 and abs(ox) >= max_ox - 2.0
+	var is_edge: bool = max_ox > 5.0 and abs(ox) >= max_ox - 2.0
 	if is_edge:
 		# Lean cone ~25° toward outer side; wider arc so flanks are covered
-		var lean := right * sign(ox) * 0.45
+		var lean: Vector2 = right * sign(ox) * 0.45
 		return {"dir": (fwd + lean).normalized(), "half_angle": deg_to_rad(80.0)}
 	else:
 		return {"dir": fwd, "half_angle": deg_to_rad(50.0)}
