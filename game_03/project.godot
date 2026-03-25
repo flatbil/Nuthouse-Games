@@ -12,8 +12,12 @@ config_version=5
 
 config/name="Frontier Battalion"
 config/description="Nuthouse Games — War of 1812 Roguelite"
-run/main_scene="res://scenes/MainMenu.tscn"
+config/icon="res://icon.png"
+run/main_scene="res://scenes/SplashScreen.tscn"
 config/features=PackedStringArray("4.6", "Mobile")
+boot_splash/image="res://assets/splash.png"
+boot_splash/bg_color=Color(0.07, 0.09, 0.05, 1)
+boot_splash/fullsize=true
 
 [autoload]
 
@@ -22,6 +26,10 @@ EventBus="*res://autoloads/EventBus.gd"
 SaveManager="*res://autoloads/SaveManager.gd"
 GameManager="*res://autoloads/GameManager.gd"
 AdManager="*res://autoloads/AdManager.gd"
+Settings="*res://autoloads/Settings.gd"
+SceneTransition="*res://autoloads/SceneTransition.gd"
+Toast="*res://autoloads/Toast.gd"
+UIFactory="*res://autoloads/UIFactory.gd"
 
 [display]
 

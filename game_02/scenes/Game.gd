@@ -199,6 +199,7 @@ func _update_mining(delta: float) -> void:
 	_mine_timer += delta
 	if _mine_timer >= MINE_INTERVAL:
 		_mine_timer = 0.0
+		Settings.haptic(18)
 		_selected_asteroid.take_damage(1.0)
 
 

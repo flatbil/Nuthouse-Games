@@ -255,7 +255,7 @@ func _start_credits() -> void:
 
 func _go_to_menu() -> void:
 	credits_only = false
-	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
+	SceneTransition.go_to("res://scenes/MainMenu.tscn")
 
 
 # -------------------------------------------------------

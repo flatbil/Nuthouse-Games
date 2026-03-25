@@ -49,18 +49,10 @@ func _collect() -> void:
 
 
 func _roll_weapon_drop() -> void:
-	var rarity_weights: Dictionary = {"common": 50, "rare": 30, "epic": 15, "legendary": 5}
-	var pool: Array = []
-	for wid in GameConfig.WEAPONS.keys():
-		var rarity: String = GameConfig.WEAPONS[wid]["rarity"]
-		var w: int = rarity_weights.get(rarity, 10)
-		for _i in range(w):
-			pool.append(wid)
-	pool.shuffle()
-	var chosen: String = pool[0]
+	var weapons: Array = GameConfig.WEAPONS.keys()
+	weapons.shuffle()
+	var chosen: String = weapons[0]
 	GameManager.add_to_inventory(chosen)
-	# Notify via wave banner text signal - emit hero_weapon_changed with a special marker
-	# We encode name + rarity into a notification signal
 	EventBus.hero_weapon_changed.emit("__found__" + chosen)
 
 

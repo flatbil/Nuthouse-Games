@@ -11,13 +11,6 @@ const COLOR_GREEN    := Color(0.25, 0.75, 0.35, 1.0)
 const COLOR_DARK_BG  := Color(0.10, 0.12, 0.08, 1.0)
 const COLOR_PANEL_BG := Color(0.14, 0.16, 0.11, 0.95)
 
-const RARITY_COLORS: Dictionary = {
-	"common":    Color(0.80, 0.80, 0.80),
-	"rare":      Color(0.20, 0.55, 1.00),
-	"epic":      Color(0.70, 0.20, 0.95),
-	"legendary": Color(1.00, 0.75, 0.00),
-}
-
 # ── Unit types ─────────────────────────────────────────
 # max_hp, speed, damage, fire_rate (s), range (px), bullet_speed, color, description
 const UNIT_TYPES: Dictionary = {
@@ -254,49 +247,91 @@ const RUN_UPGRADES: Array = [
 ]
 
 # ── Weapons (equippable by hero) ───────────────────────
-# Stat values are multipliers applied to hero base stats
+# Absolute stats — each weapon has a distinct playstyle.
+# fire_rate = reload time in seconds (lower = faster).
+# scatter_count / scatter_angle apply to shot_type "scatter".
+# dual_spread applies to shot_type "dual".
 const WEAPONS: Dictionary = {
 	"flintlock": {
-		"display_name": "Flintlock Pistol",
-		"rarity":       "common",
-		"desc":         "Reliable sidearm. Fast fire, short range.",
-		"fire_rate":    0.80,
-		"damage":       0.90,
-		"range":        0.75,
+		"display_name":  "Flintlock Pistol",
+		"shot_type":     "single",
+		"damage":        3.5,
+		"fire_rate":     1.1,
+		"range":         300.0,
+		"bullet_speed":  440.0,
+		"scatter_count": 1,
+		"scatter_angle": 0.0,
+		"dual_spread":   0.0,
+		"smoke_size":    1.0,
+		"desc":          "Quick draw sidearm. Fast shots, medium range.",
 	},
 	"long_rifle": {
-		"display_name": "Long Rifle",
-		"rarity":       "rare",
-		"desc":         "Superior accuracy and stopping power.",
-		"fire_rate":    1.40,
-		"damage":       1.60,
-		"range":        1.50,
+		"display_name":  "Long Rifle",
+		"shot_type":     "single",
+		"damage":        7.0,
+		"fire_rate":     3.5,
+		"range":         520.0,
+		"bullet_speed":  580.0,
+		"scatter_count": 1,
+		"scatter_angle": 0.0,
+		"dual_spread":   0.0,
+		"smoke_size":    1.4,
+		"desc":          "Superior range and stopping power. Slow to reload.",
 	},
 	"blunderbuss": {
-		"display_name": "Blunderbuss",
-		"rarity":       "rare",
-		"desc":         "Short range devastation.",
-		"fire_rate":    0.85,
-		"damage":       2.20,
-		"range":        0.50,
+		"display_name":  "Blunderbuss",
+		"shot_type":     "scatter",
+		"damage":        3.2,
+		"fire_rate":     2.2,
+		"range":         165.0,
+		"bullet_speed":  360.0,
+		"scatter_count": 5,
+		"scatter_angle": 38.0,
+		"dual_spread":   0.0,
+		"smoke_size":    2.5,
+		"desc":          "Close-range devastation. Fires 5 pellets in a wide cone.",
 	},
 	"cavalry_pistols": {
-		"display_name": "Cavalry Pistols",
-		"rarity":       "epic",
-		"desc":         "Dual pistols. Rapid fire.",
-		"fire_rate":    0.55,
-		"damage":       0.75,
-		"range":        0.85,
+		"display_name":  "Cavalry Pistols",
+		"shot_type":     "dual",
+		"damage":        2.2,
+		"fire_rate":     0.75,
+		"range":         220.0,
+		"bullet_speed":  460.0,
+		"scatter_count": 1,
+		"scatter_angle": 0.0,
+		"dual_spread":   10.0,
+		"smoke_size":    1.0,
+		"desc":          "Dual pistols fire together. Rapid and relentless.",
 	},
 	"kentucky_rifle": {
-		"display_name": "Kentucky Rifle",
-		"rarity":       "legendary",
-		"desc":         "Master crafted. Extreme range and damage.",
-		"fire_rate":    1.60,
-		"damage":       2.80,
-		"range":        1.90,
+		"display_name":  "Kentucky Rifle",
+		"shot_type":     "penetrating",
+		"damage":        12.0,
+		"fire_rate":     4.5,
+		"range":         700.0,
+		"bullet_speed":  620.0,
+		"scatter_count": 1,
+		"scatter_angle": 0.0,
+		"dual_spread":   0.0,
+		"smoke_size":    1.6,
+		"desc":          "Master-crafted. Bullet pierces through multiple enemies.",
 	},
 }
+
+const WEAPON_MAX_LEVEL    := 3
+const WEAPON_UPGRADE_COST := 3   # copies needed per level
+
+# Per-level scaling: damage +15%, fire_rate -10% (faster), range +10%
+static func weapon_stat(weapon_id: String, stat: String, level: int) -> float:
+	var base: float = float(WEAPONS.get(weapon_id, {}).get(stat, 0.0))
+	if base == 0.0:
+		return base
+	match stat:
+		"damage":    return base * pow(1.15, level)
+		"fire_rate": return base * pow(0.90, level)
+		"range":     return base * (1.0 + level * 0.10)
+		_:           return base
 
 # ── Uniform upgrade ────────────────────────────────────
 const UNIFORM_MAX_LEVEL   := 10
@@ -330,12 +365,14 @@ static func uniform_speed_mult(level: int) -> float:
 const COLLECTIBLE_DROPS: Dictionary = {
 	"skirmisher":      [{"type": "gold",   "amount": 3,  "chance": 1.00}],
 	"musketman":       [{"type": "gold",   "amount": 5,  "chance": 0.80},
-	                    {"type": "gem",    "amount": 1,  "chance": 0.20}],
+	                    {"type": "gem",    "amount": 1,  "chance": 0.20},
+	                    {"type": "weapon", "amount": 1,  "chance": 0.05}],
 	"grenadier_enemy": [{"type": "gold",   "amount": 12, "chance": 0.70},
-	                    {"type": "gem",    "amount": 2,  "chance": 0.30}],
+	                    {"type": "gem",    "amount": 2,  "chance": 0.30},
+	                    {"type": "weapon", "amount": 1,  "chance": 0.15}],
 	"cavalry":         [{"type": "gold",   "amount": 10, "chance": 0.60},
 	                    {"type": "gem",    "amount": 2,  "chance": 0.30},
-	                    {"type": "weapon", "amount": 1,  "chance": 0.10}],
+	                    {"type": "weapon", "amount": 1,  "chance": 0.25}],
 }
 
 # ── Meta upgrades (spend Hoard between runs) ───────────

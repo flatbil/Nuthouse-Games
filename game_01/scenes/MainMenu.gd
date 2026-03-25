@@ -97,17 +97,17 @@ func _make_btn(label: String) -> Button:
 
 func _on_continue() -> void:
 	if GameManager.game_days >= GameManager.RETIREMENT_AGE_DAYS:
-		get_tree().change_scene_to_file("res://scenes/RetirementScreen.tscn")
+		SceneTransition.go_to("res://scenes/RetirementScreen.tscn")
 	else:
-		get_tree().change_scene_to_file("res://scenes/Game.tscn")
+		SceneTransition.go_to("res://scenes/Game.tscn")
 
 
 func _on_new_game() -> void:
 	SaveManager.delete_save()
 	GameManager.reset()
-	get_tree().change_scene_to_file("res://scenes/Game.tscn")
+	SceneTransition.go_to("res://scenes/Game.tscn")
 
 
 func _on_credits() -> void:
 	EndScreen.credits_only = true
-	get_tree().change_scene_to_file("res://scenes/EndScreen.tscn")
+	SceneTransition.go_to("res://scenes/EndScreen.tscn")

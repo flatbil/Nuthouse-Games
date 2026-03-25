@@ -7,8 +7,10 @@ var is_player:      bool    = true
 var is_grenade:     bool    = false
 var grenade_radius: float   = 70.0
 var smoke_size:     float   = 1.0   # 1.0 = small arms, 2+ = musket
+var is_penetrating: bool    = false
 
-var _age: float = 0.0
+var _age:     float = 0.0
+var _hit_ids: Array = []
 
 @onready var shape:  CollisionShape2D = $Shape
 @onready var visual: Polygon2D        = $Visual
@@ -72,11 +74,21 @@ func _hit(target: Node) -> void:
 				if t.has_method("take_damage"):
 					t.take_damage(damage)
 		_spawn_impact(true)
+		queue_free()
+	elif is_penetrating:
+		var tid: int = target.get_instance_id()
+		if _hit_ids.has(tid):
+			return
+		_hit_ids.append(tid)
+		if target.has_method("take_damage"):
+			target.take_damage(damage)
+		_spawn_impact(false)
+		# Bullet continues — no queue_free
 	else:
 		if target.has_method("take_damage"):
 			target.take_damage(damage)
 		_spawn_impact(false)
-	queue_free()
+		queue_free()
 
 
 func _spawn_muzzle_smoke() -> void:

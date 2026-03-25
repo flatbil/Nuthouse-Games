@@ -36,7 +36,7 @@ func _build_ui() -> void:
 	back_btn.text = "← Back"
 	back_btn.custom_minimum_size = Vector2(90, 60)
 	back_btn.add_theme_font_size_override("font_size", 18)
-	back_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+	back_btn.pressed.connect(func(): SceneTransition.go_to("res://scenes/MainMenu.tscn"))
 	header_bar.add_child(back_btn)
 
 	var title := Label.new()

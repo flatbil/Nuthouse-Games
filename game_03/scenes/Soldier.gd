@@ -15,6 +15,12 @@ var melee_range:   float  = 28.0
 var melee_rate:    float  = 0.5
 var melee_weapon:  String = "weap_sword"
 
+var weapon_shot_type:  String = "single"
+var scatter_count:     int    = 1
+var scatter_angle_deg: float  = 0.0
+var dual_spread_deg:   float  = 0.0
+var is_penetrating:    bool   = false
+
 var _fire_timer:  float = 0.0
 var _melee_timer: float = 0.0
 var _is_alive:    bool  = true
@@ -46,6 +52,17 @@ func setup(type: String) -> void:
 	melee_weapon = str(cfg.get("melee_weapon", "weap_sword"))
 	weapon.texture = load("res://assets/sprites/" + melee_weapon + ".png")
 	smoke_size   = float(cfg.get("smoke_size", 1.0))
+	# Hero reads shot behavior from equipped weapon
+	if type == "hero":
+		var wid: String      = GameManager.hero_weapon
+		var wcfg: Dictionary = GameConfig.WEAPONS.get(wid, {})
+		weapon_shot_type  = str(wcfg.get("shot_type",    "single"))
+		scatter_count     = int(wcfg.get("scatter_count", 1))
+		scatter_angle_deg = float(wcfg.get("scatter_angle", 0.0))
+		dual_spread_deg   = float(wcfg.get("dual_spread",  0.0))
+		is_penetrating    = weapon_shot_type == "penetrating"
+		bullet_speed      = float(wcfg.get("bullet_speed", bullet_speed))
+		smoke_size        = float(wcfg.get("smoke_size",   smoke_size))
 
 
 func take_damage(amount: float) -> void:
@@ -103,19 +120,44 @@ func tick_fire(delta: float, target: Node2D, bullet_scene: PackedScene, parent: 
 
 
 func _shoot(target: Node2D, bullet_scene: PackedScene, parent: Node) -> void:
+	var dir: Vector2 = (target.global_position - global_position).normalized()
+	match weapon_shot_type:
+		"scatter":
+			_shoot_scatter(dir, bullet_scene, parent)
+		"dual":
+			_shoot_dual(dir, bullet_scene, parent)
+		_:
+			_spawn_bullet(dir, damage, bullet_scene, parent)
+
+
+func _spawn_bullet(dir: Vector2, dmg: float, bullet_scene: PackedScene, parent: Node) -> void:
 	var bullet := bullet_scene.instantiate() as Area2D
 	bullet.global_position = global_position
-	bullet.damage          = damage
+	bullet.damage          = dmg
 	bullet.is_player       = true
 	bullet.is_grenade      = is_grenade
 	bullet.grenade_radius  = grenade_radius
 	bullet.smoke_size      = smoke_size
+	bullet.is_penetrating  = is_penetrating
 	if is_grenade:
 		bullet.lifetime = 1.2
-	var dir: Vector2 = (target.global_position - global_position).normalized()
 	bullet.velocity = dir * bullet_speed
 	bullet.rotation = dir.angle()
 	parent.add_child(bullet)
+
+
+func _shoot_scatter(base_dir: Vector2, bullet_scene: PackedScene, parent: Node) -> void:
+	var half: float = deg_to_rad(scatter_angle_deg * 0.5)
+	for i in range(scatter_count):
+		var t: float = float(i) / max(scatter_count - 1, 1)
+		var angle: float = lerp(-half, half, t)
+		_spawn_bullet(base_dir.rotated(angle), damage, bullet_scene, parent)
+
+
+func _shoot_dual(base_dir: Vector2, bullet_scene: PackedScene, parent: Node) -> void:
+	var spread: float = deg_to_rad(dual_spread_deg * 0.5)
+	for side in [-1, 1]:
+		_spawn_bullet(base_dir.rotated(spread * side), damage, bullet_scene, parent)
 
 
 func _die() -> void:

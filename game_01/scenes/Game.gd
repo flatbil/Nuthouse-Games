@@ -153,6 +153,7 @@ func _input(event: InputEvent) -> void:
 		return
 	GameManager.tap()
 	_spawn_tap_label(pos, GameManager.get_effective_tap_value())
+	Settings.haptic(15)
 	if _coin_sfx.stream != null and Settings.sfx_enabled:
 		_coin_sfx.volume_db = Settings.sfx_volume_db()
 		_coin_sfx.play()
@@ -181,11 +182,13 @@ func _on_tap_value_changed(_val: float) -> void:
 func _on_career_purchased(index: int) -> void:
 	_refresh_career_button(index)
 	_burst_at_upgrade("career", "Career_%d" % index)
+	Settings.haptic(35)
 
 
 func _on_investment_purchased(index: int) -> void:
 	_refresh_investment_button(index)
 	_burst_at_upgrade("investments", "Investment_%d" % index)
+	Settings.haptic(35)
 	if _tada_sfx.stream != null and Settings.sfx_enabled:
 		_tada_sfx.pitch_scale = randf_range(0.95, 1.05)
 		_tada_sfx.volume_db   = Settings.sfx_volume_db()
@@ -196,6 +199,7 @@ func _on_strategy_purchased(index: int) -> void:
 	_refresh_strategy_button(index)
 	_refresh_all_buttons()  # strategy multiplier affects all investment displays
 	_burst_at_upgrade("strategies", "Strategy_%d" % index)
+	Settings.haptic(35)
 
 
 func _on_venture_purchased(index: int) -> void:
@@ -389,7 +393,7 @@ func _on_loan_rewarded(amount: float) -> void:
 
 
 func _on_game_ended() -> void:
-	get_tree().change_scene_to_file("res://scenes/RetirementScreen.tscn")
+	SceneTransition.go_to("res://scenes/RetirementScreen.tscn")
 
 
 func _add_debug_buttons() -> void:
@@ -1196,7 +1200,7 @@ func _close_settings() -> void:
 func _on_return_to_menu() -> void:
 	SaveManager.save()
 	_settings_visible = false
-	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
+	SceneTransition.go_to("res://scenes/MainMenu.tscn")
 
 
 # -------------------------------------------------------

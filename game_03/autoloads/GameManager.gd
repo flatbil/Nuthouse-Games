@@ -9,7 +9,9 @@ var unlocked_units: Array = ["frontiersman", "militiaman", "continental"]
 
 var gems:             int        = 0
 var hero_weapon:      String     = "flintlock"
-var weapon_inventory: Dictionary = {"flintlock": 1}  # weapon_id -> count
+var weapon_arsenal:   Array      = ["flintlock"]      # unlocked, equippable
+var weapon_inventory: Dictionary = {}                  # weapon_id -> extra copies for upgrading
+var weapon_levels:    Dictionary = {}                  # weapon_id -> level (0–3)
 var uniform_level:    int        = 0
 
 # Per-run state (reset each run)
@@ -28,10 +30,12 @@ func reset() -> void:
 	best_wave      = 0
 	total_runs     = 0
 	unlocked_units = ["frontiersman", "militiaman", "continental"]
-	gems           = 0
-	hero_weapon       = "flintlock"
-	weapon_inventory  = {"flintlock": 1}
-	uniform_level     = 0
+	gems             = 0
+	hero_weapon      = "flintlock"
+	weapon_arsenal   = ["flintlock"]
+	weapon_inventory = {}
+	weapon_levels    = {}
+	uniform_level    = 0
 	_init_meta_levels()
 
 func _init_meta_levels() -> void:
@@ -108,11 +112,12 @@ func get_unit_stat(unit_type: String, stat: String) -> float:
 				base += float(upgrade["bonus"]) * level
 	# Apply run mults
 	base *= get_run_stat_mult(stat)
-	# Apply hero weapon + uniform multipliers
+	# Hero weapon: absolute stats from weapon config, uniform bonuses on top
 	if unit_type == "hero":
-		var weapon: Dictionary = GameConfig.WEAPONS.get(hero_weapon, {})
-		if weapon.has(stat):
-			base *= float(weapon[stat])
+		var lv: int = weapon_levels.get(hero_weapon, 0)
+		match stat:
+			"damage", "fire_rate", "range":
+				base = GameConfig.weapon_stat(hero_weapon, stat, lv)
 		match stat:
 			"max_hp": base += float(GameConfig.uniform_hp_bonus(uniform_level))
 			"damage": base *= GameConfig.uniform_damage_mult(uniform_level)
@@ -157,63 +162,36 @@ func add_gems(amount: int) -> void:
 
 
 func equip_weapon(weapon_id: String) -> void:
-	if weapon_inventory.has(weapon_id):
+	if weapon_arsenal.has(weapon_id):
 		hero_weapon = weapon_id
 		EventBus.hero_weapon_changed.emit(weapon_id)
 		_save()
 
 
 func add_to_inventory(weapon_id: String) -> void:
-	weapon_inventory[weapon_id] = weapon_inventory.get(weapon_id, 0) + 1
+	if not weapon_arsenal.has(weapon_id):
+		# First copy — unlock for equipping
+		weapon_arsenal.append(weapon_id)
+	else:
+		# Extra copy — goes to forge inventory
+		weapon_inventory[weapon_id] = weapon_inventory.get(weapon_id, 0) + 1
 	_save()
 
 
-# ── Crafting ───────────────────────────────────────────
+# ── Weapon forging ─────────────────────────────────────
 
-func can_combine(rarity: String) -> bool:
-	return _count_rarity(rarity) >= 3
+func can_upgrade_weapon(weapon_id: String) -> bool:
+	return weapon_arsenal.has(weapon_id) \
+		and weapon_inventory.get(weapon_id, 0) >= GameConfig.WEAPON_UPGRADE_COST \
+		and weapon_levels.get(weapon_id, 0) < GameConfig.WEAPON_MAX_LEVEL
 
 
-func combine_weapons(rarity: String) -> String:
-	if not can_combine(rarity):
-		return ""
-	# Remove 3 weapons of this rarity from inventory
-	var to_remove: int = 3
-	for wid in weapon_inventory.keys():
-		if to_remove == 0:
-			break
-		if not GameConfig.WEAPONS.has(wid):
-			continue
-		if GameConfig.WEAPONS[wid]["rarity"] != rarity:
-			continue
-		var take: int = min(weapon_inventory[wid], to_remove)
-		weapon_inventory[wid] -= take
-		to_remove -= take
-		if weapon_inventory[wid] <= 0:
-			weapon_inventory.erase(wid)
-			if hero_weapon == wid:
-				# Equip whatever is still in inventory, fallback flintlock
-				hero_weapon = weapon_inventory.keys()[0] if not weapon_inventory.is_empty() else "flintlock"
-				if weapon_inventory.is_empty():
-					weapon_inventory["flintlock"] = 1
-	# Determine next rarity
-	var order: Array = ["common", "rare", "epic", "legendary"]
-	var idx: int = order.find(rarity)
-	if idx < 0 or idx >= order.size() - 1:
-		return ""
-	var next_rarity: String = order[idx + 1]
-	# Pick a random weapon of next rarity
-	var candidates: Array = []
-	for wid in GameConfig.WEAPONS.keys():
-		if GameConfig.WEAPONS[wid]["rarity"] == next_rarity:
-			candidates.append(wid)
-	if candidates.is_empty():
-		return ""
-	candidates.shuffle()
-	var gained: String = candidates[0]
-	weapon_inventory[gained] = weapon_inventory.get(gained, 0) + 1
+func upgrade_weapon(weapon_id: String) -> void:
+	if not can_upgrade_weapon(weapon_id):
+		return
+	weapon_inventory[weapon_id] -= GameConfig.WEAPON_UPGRADE_COST
+	weapon_levels[weapon_id] = weapon_levels.get(weapon_id, 0) + 1
 	_save()
-	return gained
 
 
 func can_upgrade_uniform() -> bool:
@@ -230,24 +208,18 @@ func upgrade_uniform() -> void:
 	_save()
 
 
-func _count_rarity(rarity: String) -> int:
-	var total: int = 0
-	for wid in weapon_inventory.keys():
-		if GameConfig.WEAPONS.has(wid) and GameConfig.WEAPONS[wid]["rarity"] == rarity:
-			total += weapon_inventory.get(wid, 0)
-	return total
-
-
 func _save() -> void:
 	var data := {
-		"hoard":          hoard,
-		"meta_levels":    meta_levels,
-		"best_wave":      best_wave,
-		"total_runs":     total_runs,
-		"unlocked_units": unlocked_units,
-		"gems":           gems,
-		"hero_weapon":    hero_weapon,
+		"hoard":            hoard,
+		"meta_levels":      meta_levels,
+		"best_wave":        best_wave,
+		"total_runs":       total_runs,
+		"unlocked_units":   unlocked_units,
+		"gems":             gems,
+		"hero_weapon":      hero_weapon,
+		"weapon_arsenal":   weapon_arsenal,
 		"weapon_inventory": weapon_inventory,
+		"weapon_levels":    weapon_levels,
 		"uniform_level":    uniform_level,
 	}
 	SaveManager.save(data)
@@ -269,13 +241,29 @@ func _load() -> void:
 	gems          = int(data.get("gems", 0))
 	hero_weapon   = str(data.get("hero_weapon", "flintlock"))
 	uniform_level = int(data.get("uniform_level", 0))
-	var saved_inv = data.get("weapon_inventory", {"flintlock": 1})
+	# Arsenal
+	var saved_arsenal = data.get("weapon_arsenal", [])
+	weapon_arsenal = []
+	for wid in saved_arsenal:
+		weapon_arsenal.append(str(wid))
+	if weapon_arsenal.is_empty():
+		weapon_arsenal = ["flintlock"]
+	# Inventory (extra forge copies)
+	var saved_inv = data.get("weapon_inventory", {})
 	weapon_inventory = {}
 	for wid in saved_inv.keys():
 		weapon_inventory[str(wid)] = int(saved_inv[wid])
-	if weapon_inventory.is_empty():
-		weapon_inventory["flintlock"] = 1
-	# Backward compat: migrate old owned_weapons array
-	if data.has("owned_weapons") and not data.has("weapon_inventory"):
-		for w in data["owned_weapons"]:
-			weapon_inventory[str(w)] = weapon_inventory.get(str(w), 0) + 1
+	# Levels
+	var saved_lv = data.get("weapon_levels", {})
+	weapon_levels = {}
+	for wid in saved_lv.keys():
+		weapon_levels[str(wid)] = int(saved_lv[wid])
+	# Backward compat: old save had weapon_inventory as equip-ownership dict
+	if not data.has("weapon_arsenal") and data.has("weapon_inventory"):
+		weapon_arsenal = []
+		for wid in weapon_inventory.keys():
+			if int(weapon_inventory[wid]) > 0 and not weapon_arsenal.has(str(wid)):
+				weapon_arsenal.append(str(wid))
+		weapon_inventory = {}
+	if not weapon_arsenal.has(hero_weapon):
+		weapon_arsenal.append(hero_weapon)

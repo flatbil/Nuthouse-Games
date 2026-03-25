@@ -43,9 +43,14 @@ const SPAWN_INTERVAL  := 0.8
 var _game_over:       bool  = false
 var _upgrade_pending: bool  = false
 var _is_paused:       bool  = false
-var _sound_muted:     bool  = false
 var _pause_panel:     Control = null
 var _sound_btn:       Button  = null
+
+# ── Camera / screen shake ─────────────────────────────
+var _camera:          Camera2D = null
+var _shake_strength:  float    = 0.0
+var _last_hp:         int      = -1
+const SHAKE_DECAY     := 9.0    # strength lost per second
 
 
 func _ready() -> void:
@@ -60,6 +65,16 @@ func _ready() -> void:
 	_build_pause_menu()
 	_build_joystick()
 	_draw_background()
+	# Add Camera2D for screen shake support.
+	# Without a camera, Godot renders with top-left at (0,0).
+	# Replicating that means centering the camera on the viewport midpoint.
+	_camera = Camera2D.new()
+	var vp := get_viewport_rect().size
+	_camera.position = vp * 0.5
+	_camera.enabled  = true
+	add_child(_camera)
+	# Apply saved sound setting on startup
+	AudioServer.set_bus_mute(0, not Settings.sfx_enabled)
 	GameManager.start_run()
 	_setup_formation()
 	_start_wave()
@@ -70,6 +85,7 @@ func _process(delta: float) -> void:
 		return
 	_tick_spawner(delta)
 	_update_keyboard_input()
+	_tick_shake(delta)
 	# Check wave clear
 	if _wave_in_progress and _spawn_queue.is_empty() and _enemies_alive == 0:
 		_on_wave_cleared()
@@ -147,6 +163,7 @@ func _spawn_enemy(type: String) -> void:
 func _on_wave_cleared() -> void:
 	_wave_in_progress = false
 	_between_waves    = true
+	Settings.haptic(60)
 	EventBus.wave_cleared.emit(_current_wave)
 	if _current_wave >= GameConfig.WAVES.size():
 		_end_run(true)
@@ -165,7 +182,7 @@ func _end_run(victory: bool) -> void:
 
 # ── Run over screen ────────────────────────────────────
 func _show_run_over_screen(victory: bool) -> void:
-	var panel := _make_panel(Vector2(280, 340), Vector2(
+	var panel := UIFactory.make_panel(Vector2(280, 340), Vector2(
 		get_viewport_rect().size.x * 0.5 - 140,
 		get_viewport_rect().size.y * 0.5 - 170))
 	hud.add_child(panel)
@@ -196,13 +213,13 @@ func _show_run_over_screen(victory: bool) -> void:
 	var btn_menu := Button.new()
 	btn_menu.text = "Main Menu"
 	btn_menu.custom_minimum_size = Vector2(0, 52)
-	btn_menu.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/MainMenu.tscn"))
+	btn_menu.pressed.connect(func(): SceneTransition.go_to("res://scenes/MainMenu.tscn"))
 	vbox.add_child(btn_menu)
 
 	var btn_again := Button.new()
 	btn_again.text = "Play Again"
 	btn_again.custom_minimum_size = Vector2(0, 52)
-	btn_again.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/Game.tscn"))
+	btn_again.pressed.connect(func(): SceneTransition.go_to("res://scenes/Game.tscn"))
 	vbox.add_child(btn_again)
 
 
@@ -216,7 +233,7 @@ func _show_upgrade_panel() -> void:
 		(_pause_panel.get_meta("dim") as ColorRect).visible = false
 	var choices := GameManager.get_run_upgrade_choices(3)
 	var vp: Vector2 = get_viewport_rect().size
-	var panel := _make_panel(Vector2(320, 380), Vector2(vp.x * 0.5 - 160, vp.y * 0.5 - 190))
+	var panel := UIFactory.make_panel(Vector2(320, 380), Vector2(vp.x * 0.5 - 160, vp.y * 0.5 - 190))
 	panel.name = "UpgradePanel"
 	hud.add_child(panel)
 	_upgrade_panel = panel
@@ -243,6 +260,7 @@ func _show_upgrade_panel() -> void:
 
 
 func _on_upgrade_chosen(choice: Dictionary) -> void:
+	Settings.haptic(35)
 	if is_instance_valid(_upgrade_panel):
 		_upgrade_panel.queue_free()
 		_upgrade_panel = null
@@ -258,15 +276,17 @@ func _on_upgrade_chosen(choice: Dictionary) -> void:
 
 # ── HUD ───────────────────────────────────────────────
 func _build_hud() -> void:
+	var st: float = UIFactory.safe_top()
+
 	# Wave label
 	_wave_label = Label.new()
 	_wave_label.add_theme_font_size_override("font_size", 18)
 	_wave_label.add_theme_color_override("font_color", Color.WHITE)
 	_wave_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	_wave_label.offset_left   = -120.0
-	_wave_label.offset_top    = 10.0
+	_wave_label.offset_top    = st + 10.0
 	_wave_label.offset_right  = -8.0
-	_wave_label.offset_bottom = 40.0
+	_wave_label.offset_bottom = st + 40.0
 	_wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_wave_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(_wave_label)
@@ -277,9 +297,9 @@ func _build_hud() -> void:
 	_hp_label.add_theme_color_override("font_color", GameConfig.COLOR_GREEN)
 	_hp_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_hp_label.offset_left   = 8.0
-	_hp_label.offset_top    = 10.0
+	_hp_label.offset_top    = st + 10.0
 	_hp_label.offset_right  = 160.0
-	_hp_label.offset_bottom = 40.0
+	_hp_label.offset_bottom = st + 40.0
 	_hp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(_hp_label)
 
@@ -289,9 +309,9 @@ func _build_hud() -> void:
 	_hoard_label.add_theme_color_override("font_color", GameConfig.COLOR_GOLD)
 	_hoard_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_hoard_label.offset_left   = 8.0
-	_hoard_label.offset_top    = 38.0
+	_hoard_label.offset_top    = st + 38.0
 	_hoard_label.offset_right  = 180.0
-	_hoard_label.offset_bottom = 62.0
+	_hoard_label.offset_bottom = st + 62.0
 	_hoard_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud.add_child(_hoard_label)
 
@@ -301,9 +321,9 @@ func _build_hud() -> void:
 	_gems_label.add_theme_color_override("font_color", Color(0.30, 0.60, 1.00))
 	_gems_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_gems_label.offset_left   = 8.0
-	_gems_label.offset_top    = 62.0
+	_gems_label.offset_top    = st + 62.0
 	_gems_label.offset_right  = 180.0
-	_gems_label.offset_bottom = 86.0
+	_gems_label.offset_bottom = st + 86.0
 	_gems_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_gems_label.text = "♦ %d gems" % GameManager.gems
 	hud.add_child(_gems_label)
@@ -330,8 +350,8 @@ func _build_hud() -> void:
 	menu_btn.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	menu_btn.offset_left   = -28.0
 	menu_btn.offset_right  =  28.0
-	menu_btn.offset_top    =  6.0
-	menu_btn.offset_bottom =  44.0
+	menu_btn.offset_top    = st + 6.0
+	menu_btn.offset_bottom = st + 44.0
 	menu_btn.flat = true
 	menu_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	menu_btn.pressed.connect(_toggle_pause)
@@ -354,7 +374,7 @@ func _build_pause_menu() -> void:
 	hud.add_child(overlay)
 
 	# Centred panel
-	var panel := _make_panel(Vector2(270, 320), Vector2(vp.x * 0.5 - 135, vp.y * 0.5 - 160))
+	var panel := UIFactory.make_panel(Vector2(270, 320), Vector2(vp.x * 0.5 - 135, vp.y * 0.5 - 160))
 	panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	panel.visible      = false
 	panel.name         = "PausePanel"
@@ -383,7 +403,7 @@ func _build_pause_menu() -> void:
 	vbox.add_child(btn_resume)
 
 	_sound_btn = Button.new()
-	_sound_btn.text = "Sound: ON"
+	_sound_btn.text = "Sound: ON" if Settings.sfx_enabled else "Sound: OFF"
 	_sound_btn.custom_minimum_size = Vector2(0, 52)
 	_sound_btn.pressed.connect(_toggle_sound)
 	vbox.add_child(_sound_btn)
@@ -409,15 +429,14 @@ func _toggle_pause() -> void:
 
 
 func _toggle_sound() -> void:
-	_sound_muted = not _sound_muted
-	AudioServer.set_bus_mute(0, _sound_muted)
+	Settings.set_sfx(not Settings.sfx_enabled)
+	AudioServer.set_bus_mute(0, not Settings.sfx_enabled)
 	if is_instance_valid(_sound_btn):
-		_sound_btn.text = "Sound: OFF" if _sound_muted else "Sound: ON"
+		_sound_btn.text = "Sound: ON" if Settings.sfx_enabled else "Sound: OFF"
 
 
 func _go_to_main_menu() -> void:
-	get_tree().paused = false
-	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
+	SceneTransition.go_to("res://scenes/MainMenu.tscn")
 
 
 func _update_hud() -> void:
@@ -439,12 +458,35 @@ func _show_wave_banner(text: String) -> void:
 
 func _on_enemy_killed(_pos: Vector2, _reward: int) -> void:
 	_enemies_alive = max(0, _enemies_alive - 1)
+	Settings.haptic(20)
 	_update_hud()
 
 
 func _on_hp_changed(current: int, maximum: int) -> void:
+	if _last_hp > 0 and current < _last_hp:
+		# Scale shake by fraction of max HP lost — cavalry hit shakes harder than a tap
+		var lost: float = float(_last_hp - current)
+		var strength: float = clampf(lost / float(max(maximum, 1)) * 14.0, 2.5, 9.0)
+		_start_shake(strength)
+	_last_hp = current
 	if is_instance_valid(_hp_label):
 		_hp_label.text = "❤ %d / %d" % [current, maximum]
+
+
+func _start_shake(strength: float) -> void:
+	_shake_strength = maxf(_shake_strength, strength)
+
+
+func _tick_shake(delta: float) -> void:
+	if _shake_strength <= 0.0:
+		return
+	if is_instance_valid(_camera):
+		_camera.offset = Vector2(
+			randf_range(-_shake_strength, _shake_strength),
+			randf_range(-_shake_strength, _shake_strength))
+	_shake_strength = move_toward(_shake_strength, 0.0, SHAKE_DECAY * delta)
+	if _shake_strength <= 0.0 and is_instance_valid(_camera):
+		_camera.offset = Vector2.ZERO
 
 
 func _on_entity_died(pos: Vector2, is_enemy: bool) -> void:
@@ -469,6 +511,7 @@ func _on_entity_died(pos: Vector2, is_enemy: bool) -> void:
 
 func _on_formation_destroyed() -> void:
 	if not _game_over:
+		Settings.haptic(150)
 		_end_run(false)
 
 
@@ -496,8 +539,8 @@ func _on_hero_weapon_changed(weapon_id: String) -> void:
 		var wid: String = weapon_id.substr(9)
 		var w: Dictionary = GameConfig.WEAPONS.get(wid, {})
 		if not w.is_empty():
-			var rarity: String = w["rarity"]
-			_show_wave_banner("%s\n[%s]" % [w["display_name"], rarity.to_upper()])
+			var shot: String = str(w.get("shot_type", "")).to_upper()
+			_show_wave_banner("%s\n[%s]" % [w["display_name"], shot])
 
 
 # ── Virtual joystick ──────────────────────────────────
@@ -587,20 +630,4 @@ func _draw_background() -> void:
 	world.add_child(overlay)
 
 
-# ── Helper ────────────────────────────────────────────
-func _make_panel(sz: Vector2, pos: Vector2) -> PanelContainer:
-	var style := StyleBoxFlat.new()
-	style.bg_color                   = GameConfig.COLOR_PANEL_BG
-	style.corner_radius_top_left     = 16
-	style.corner_radius_top_right    = 16
-	style.corner_radius_bottom_left  = 16
-	style.corner_radius_bottom_right = 16
-	style.content_margin_left        = 16.0
-	style.content_margin_right       = 16.0
-	style.content_margin_top         = 16.0
-	style.content_margin_bottom      = 16.0
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", style)
-	panel.custom_minimum_size = sz
-	panel.position = pos
-	return panel
+# _make_panel removed — use UIFactory.make_panel() instead.

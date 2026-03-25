@@ -167,11 +167,11 @@ func _spacer_h(parent: Control, width: int) -> void:
 
 func _on_new_life(inheritance: float) -> void:
 	GameManager.start_new_generation(inheritance)
-	get_tree().change_scene_to_file("res://scenes/Game.tscn")
+	SceneTransition.go_to("res://scenes/Game.tscn")
 
 
 func _on_menu() -> void:
-	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
+	SceneTransition.go_to("res://scenes/MainMenu.tscn")
 
 
 # -------------------------------------------------------

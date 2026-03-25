@@ -27,6 +27,9 @@ SaveManager="*res://autoloads/SaveManager.gd"
 GameManager="*res://autoloads/GameManager.gd"
 AdManager="*res://autoloads/AdManager.gd"
 Settings="*res://autoloads/Settings.gd"
+SceneTransition="*res://autoloads/SceneTransition.gd"
+Toast="*res://autoloads/Toast.gd"
+UIFactory="*res://autoloads/UIFactory.gd"
 
 [display]
 
