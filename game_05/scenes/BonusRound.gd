@@ -234,13 +234,13 @@ func _start_spin() -> void:
 			break
 
 	# Resolve glitch prize
-	var chosen := GameConfig.BONUS_PRIZES[_chosen_prize_idx]
+	var chosen: Dictionary = GameConfig.BONUS_PRIZES[_chosen_prize_idx]
 	var final_mult: int = chosen["mult"]
 	if final_mult == -1:
 		final_mult = (randi() % 50 + 1) * 10  # random 10–500 in steps of 10
 
 	# Fill strip cells randomly except last = winner
-	var prizes := GameConfig.BONUS_PRIZES
+	var prizes: Array = GameConfig.BONUS_PRIZES
 	for i in range(PRIZE_STRIP_PRE):
 		var rand_prize: Dictionary = prizes[randi() % prizes.size()]
 		_fill_strip_cell(i, rand_prize)
